@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Ordinary forwarding, M3 scheduling and M5 destination adjudication rules.
 
-M6 restoration is still unimplemented; winners remain safely dropped.
+M6 restores only the deciding copy in P4; destination rules stay unchanged.
 """
 
 import argparse

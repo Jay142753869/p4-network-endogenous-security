@@ -1,0 +1,55 @@
+$ python3 -m py_compile mycontroller.py tests/check_m5.py tests/check_m6.py tests/check_m6_pcaps.py receive-poly.py run-poly-tests.py
+exit_code=0
+
+$ git --git-dir=.course-git --work-tree=. diff --check
+exit_code=0
+
+$ git --git-dir=.course-git --work-tree=. diff --exit-code 235c188 -- utils topo reference materials STUDENT_TODO.md run-poly-tests.py read-counters.py evaluate-counters.py send-poly.py receive-poly.py tests/check_m2_parser.py tests/check_m3.py tests/check_m4.py tests/check_m4_pcaps.py
+exit_code=0
+
+$ p4c-bm2-ss --version
+p4c-bm2-ss
+Version 1.2.5.15 (SHA: cdd7205767 BUILD: Release)
+exit_code=0
+
+$ simple_switch --version
+1.15.4-883d4eae
+exit_code=0
+
+$ mn --version
+2.3.1b4
+exit_code=0
+
+UNCHANGED compiled action primitives: MyIngress.adjudicate_polymorphic (139)
+
+UNCHANGED compiled action primitives: MyIngress.prepare_polymorphic (21)
+
+UNCHANGED compiled action primitives: MyIngress.start_polymorphic (2)
+
+UNCHANGED compiled register_arrays
+
+UNCHANGED compiled counter_arrays
+
+UNCHANGED compiled parsers
+
+UNCHANGED compiled deparsers
+
+UNCHANGED compiled checksums
+
+UNCHANGED compiled calculations
+
+sha256 polymorphic.p4 bab6df3a6a60a661bdde891865f674fb0f5722c2996f4059fe4fff8e87bf6aef
+
+sha256 mycontroller.py 155dc131549d3a2078ccfbfd00195ab545a85513d8f1594019da098f29a9efdd
+
+sha256 tests/check_m5.py ff3323160f2a26b92858d009afaa319e8d58b04348be91862179066e6eec6674
+
+sha256 tests/check_m6.py 426fcbb661afa8de12a55efab4afd45ff1ab9d6e43098664c47afd258d52215c
+
+sha256 tests/check_m6_pcaps.py 50fc3ffecfa4b478db1b9e9c3488ebb04edcfc17720dc598de108081bcdfaeda
+
+sha256 class3/state-design.txt 25bea5faa023b320647731f02f68b4ae9638cc6baaafa34b154aebea3739ae05
+
+sha256 build/polymorphic.json 1d1b6986cf7aad31cebfb4601022653a5b73ef2649671105c99e4c62f419c734
+
+sha256 build/polymorphic.p4.p4info.txtpb d2365f6dd1fd3de02bbee23d78ea24e262591d674f64ae39ba9098915f5f4ad5

@@ -1,0 +1,21 @@
+mkdir -p build pcaps logs
+p4c-bm2-ss --p4v 16 --p4runtime-files build/polymorphic.p4.p4info.txtpb -o build/polymorphic.json polymorphic.p4
+make: Warning: File 'utils/Makefile' has modification time 5425 s in the future
+polymorphic.p4(18): [--Wwarn=unused] warning: 'ARP_HTYPE_ETHERNET' is unused
+const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
+              ^^^^^^^^^^^^^^^^^^
+polymorphic.p4(19): [--Wwarn=unused] warning: 'ARP_PTYPE_IPV4' is unused
+const bit<16> ARP_PTYPE_IPV4 = 0x0800;
+              ^^^^^^^^^^^^^^
+polymorphic.p4(20): [--Wwarn=unused] warning: 'ARP_HLEN_ETHERNET' is unused
+const bit<8> ARP_HLEN_ETHERNET = 6;
+             ^^^^^^^^^^^^^^^^^
+polymorphic.p4(21): [--Wwarn=unused] warning: 'ARP_PLEN_IPV4' is unused
+const bit<8> ARP_PLEN_IPV4 = 4;
+             ^^^^^^^^^^^^^
+polymorphic.p4(22): [--Wwarn=unused] warning: 'ARP_OPER_REQUEST' is unused
+const bit<16> ARP_OPER_REQUEST = 1;
+              ^^^^^^^^^^^^^^^^
+make: warning:  Clock skew detected.  Your build may be incomplete.
+
+exit_code=0

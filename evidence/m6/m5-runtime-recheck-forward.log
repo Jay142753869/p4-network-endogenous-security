@@ -1,0 +1,7 @@
+M4_PCAP_OK scope=full direction=0 inputs=3 modalities=3
+sequence=1 source_crc32=0x6e742083
+sequence=2 source_crc32=0xce5a4e91
+sequence=3 source_crc32=0x48ffedd5
+Verified supplied capture contents; capture provenance must be recorded separately.
+
+exit_code=0

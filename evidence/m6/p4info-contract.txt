@@ -1,0 +1,209 @@
+UNCHANGED tables MyIngress.polymorphic_destination
+preamble {
+  id: 40492749
+  name: "MyIngress.polymorphic_destination"
+  alias: "polymorphic_destination"
+}
+match_fields {
+  id: 1
+  name: "standard_metadata.ingress_port"
+  bitwidth: 9
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.poly.direction"
+  bitwidth: 8
+  match_type: EXACT
+}
+match_fields {
+  id: 3
+  name: "hdr.poly.modality_id"
+  bitwidth: 8
+  match_type: EXACT
+}
+action_refs {
+  id: 17760844
+}
+action_refs {
+  id: 26121529
+}
+action_refs {
+  id: 21257015
+}
+initial_default_action {
+  action_id: 21257015
+}
+size: 16
+
+UNCHANGED tables MyIngress.polymorphic_schedule
+preamble {
+  id: 40478806
+  name: "MyIngress.polymorphic_schedule"
+  alias: "polymorphic_schedule"
+}
+match_fields {
+  id: 1
+  name: "standard_metadata.ingress_port"
+  bitwidth: 9
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.ipv4.dstAddr"
+  bitwidth: 32
+  match_type: EXACT
+}
+match_fields {
+  id: 3
+  name: "hdr.udp.dstPort"
+  bitwidth: 16
+  match_type: EXACT
+}
+action_refs {
+  id: 23035731
+}
+action_refs {
+  id: 21257015
+}
+const_default_action_id: 21257015
+initial_default_action {
+  action_id: 21257015
+}
+size: 16
+
+UNCHANGED tables MyIngress.ipv4_lpm
+preamble {
+  id: 37375156
+  name: "MyIngress.ipv4_lpm"
+  alias: "ipv4_lpm"
+}
+match_fields {
+  id: 1
+  name: "hdr.ipv4.dstAddr"
+  bitwidth: 32
+  match_type: LPM
+}
+action_refs {
+  id: 28792405
+}
+action_refs {
+  id: 25652968
+}
+action_refs {
+  id: 21257015
+}
+initial_default_action {
+  action_id: 21257015
+}
+size: 1024
+
+UNCHANGED tables MyIngress.ipv6_lpm
+preamble {
+  id: 47351917
+  name: "MyIngress.ipv6_lpm"
+  alias: "ipv6_lpm"
+}
+match_fields {
+  id: 1
+  name: "hdr.ipv6.dstAddr"
+  bitwidth: 128
+  match_type: LPM
+}
+action_refs {
+  id: 24925451
+}
+action_refs {
+  id: 25652968
+}
+action_refs {
+  id: 21257015
+}
+initial_default_action {
+  action_id: 25652968
+}
+size: 1024
+
+UNCHANGED tables MyIngress.arp_match
+preamble {
+  id: 35372062
+  name: "MyIngress.arp_match"
+  alias: "arp_match"
+}
+match_fields {
+  id: 1
+  name: "hdr.arp.oper"
+  bitwidth: 16
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.arp.tpa"
+  bitwidth: 32
+  match_type: LPM
+}
+action_refs {
+  id: 23911168
+}
+action_refs {
+  id: 25652968
+}
+const_default_action_id: 25652968
+initial_default_action {
+  action_id: 25652968
+}
+size: 1024
+
+UNCHANGED actions MyIngress.adjudicate_polymorphic
+preamble {
+  id: 17760844
+  name: "MyIngress.adjudicate_polymorphic"
+  alias: "adjudicate_polymorphic"
+}
+
+UNCHANGED actions MyIngress.start_polymorphic
+preamble {
+  id: 23035731
+  name: "MyIngress.start_polymorphic"
+  alias: "start_polymorphic"
+}
+params {
+  id: 1
+  name: "packet_direction"
+  bitwidth: 8
+}
+
+UNCHANGED counters MyIngress.good_count
+preamble {
+  id: 306155069
+  name: "MyIngress.good_count"
+  alias: "good_count"
+}
+spec {
+  unit: PACKETS
+}
+size: 5
+
+UNCHANGED counters MyIngress.bad_count
+preamble {
+  id: 315541448
+  name: "MyIngress.bad_count"
+  alias: "bad_count"
+}
+spec {
+  unit: PACKETS
+}
+size: 5
+
+UNCHANGED counters MyIngress.no_majority_count
+preamble {
+  id: 302757400
+  name: "MyIngress.no_majority_count"
+  alias: "no_majority_count"
+}
+spec {
+  unit: PACKETS
+}
+size: 1
+
+M6 restoration is a direct Ingress action behind accept==1; no new controller rule or PRE entry is required.

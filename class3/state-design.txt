@@ -1,4 +1,4 @@
-M5 目的网关状态设计（M6 尚未接入）
+M5 目的网关状态设计（M6 已接入透明还原）
 =================================
 
 1. 范围与入口
@@ -98,11 +98,14 @@ BMv2冷启动/流水线重装把register、counter清零；源与目的需一起
 
 9. M6钩子与当前输出
 action只在当前副本首次形成多数时令meta.adjudication_accept=1。
-polymorphic_destination精确命中返回后，Ingress保留该标记但仍调用hold_polymorphic丢弃。
-不删outer/PolyShim、不改inner、不改MAC到主机、不设置主机出口。
-M6后续只在此处accept=1时接入透明还原，其他情况继续drop；不得再进入普通SR/IPv4路由。
+polymorphic_destination精确命中返回后，仅accept=1调用restore_polymorphic，其他情况hold/drop。
+把inner_ipv4复制到hdr.ipv4并移除inner实例、IPv6、完整SR栈、PolyShim；保留UDP和protected_data。
+设置EtherType=IPv4、目的网关/目的主机MAC、端口1；原有checksum control重算IPv4校验和。
+restore action直接exit，不能再次进入源调度或普通SR/IPv4路由；迟到副本仍只统计和drop。
+M5原子action、seen/decided、序号、CRC和counter逻辑保持不变。
 
 10. 验证区分
 tests/check_m5.py解释编译JSON并模拟CRC/register/counter；含错误数据、重复、顺序、窗口和回绕。
 实际M4目的入口pcap离线重放也只是JSON解释器测试，不是M5真实BMv2验证。
-当前会话真实M5网络运行尚未进行；普通IPv6反向及SR双向真实回归仍待补充。
+用户后续提供的真实M5无故障材料归档于evidence/m5-runtime；不能据此声称M6运行通过。
+M6真实状态以DEVELOPMENT_M6.md记录为准；普通IPv6反向及SR双向真实回归仍待补充。

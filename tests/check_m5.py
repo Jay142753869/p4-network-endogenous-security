@@ -94,10 +94,16 @@ class M5Checks(unittest.TestCase):
         cls.entries = m4.controller_entries(cls.helper)
 
     def assert_safe(self, packet):
-        self.assertTrue(packet.dropped)
-        self.assertEqual(packet.fields['standard_metadata', 'egress_spec'], 511)
-        self.assertIn('poly', packet.valid)
-        self.assertIn('inner_ipv4', packet.valid)
+        # M6 consumes the unchanged M5 accept bit; all other copies stay held.
+        if packet.fields['scalars', 'metadata.adjudication_accept']:
+            self.assertFalse(packet.dropped)
+            self.assertEqual(packet.fields['standard_metadata', 'egress_spec'], 1)
+            self.assertEqual(packet.valid, {'ethernet', 'ipv4', 'udp', 'protected_data'})
+        else:
+            self.assertTrue(packet.dropped)
+            self.assertEqual(packet.fields['standard_metadata', 'egress_spec'], 511)
+            self.assertIn('poly', packet.valid)
+            self.assertIn('inner_ipv4', packet.valid)
         self.assertNotIn('tbl_srcRoute_finish', packet.visited)
 
     def test_AAA_AAB_ABB_ABC_and_missing_mode(self):

@@ -543,9 +543,44 @@ control MyIngress(inout headers hdr,
         }
     }
 
-    // Fail closed for unmatched gateway arrivals and, until M6, all decisions.
+    // Fail closed for unmatched gateway arrivals and non-winning copies.
     action hold_polymorphic() {
         mark_to_drop(standard_metadata);
+        exit;
+    }
+
+    action restore_polymorphic() {
+        // The receiving gateway is the host's Ethernet next hop.
+        // Read direction before invalidating PolyShim, especially for SR.
+        if (hdr.poly.direction == 0) {
+            hdr.ethernet.srcAddr = 0x080000000200;
+            hdr.ethernet.dstAddr = 0x080000000202;
+        } else {
+            hdr.ethernet.srcAddr = 0x080000000100;
+            hdr.ethernet.dstAddr = 0x080000000101;
+        }
+        // Restore the saved IPv4 once, independently of the winning outer.
+        hdr.ipv4 = hdr.inner_ipv4;
+        hdr.ipv4.hdrChecksum = 0; // recomputed by MyComputeChecksum
+        hdr.inner_ipv4.setInvalid();
+        hdr.ipv6.setInvalid();
+        hdr.srcRoutes[0].setInvalid();
+        hdr.srcRoutes[1].setInvalid();
+        hdr.srcRoutes[2].setInvalid();
+        hdr.srcRoutes[3].setInvalid();
+        hdr.srcRoutes[4].setInvalid();
+        hdr.srcRoutes[5].setInvalid();
+        hdr.srcRoutes[6].setInvalid();
+        hdr.srcRoutes[7].setInvalid();
+        hdr.srcRoutes[8].setInvalid();
+        hdr.arp.setInvalid();
+        hdr.tcp.setInvalid();
+        hdr.poly.setInvalid();
+        hdr.ethernet.etherType = TYPE_IPV4;
+        meta.scheduled = 0;
+        standard_metadata.mcast_grp = 0;
+        standard_metadata.egress_spec = 1;
+        // Do not re-enter source scheduling, SR termination or ordinary LPM.
         exit;
     }
 
@@ -687,9 +722,11 @@ control MyIngress(inout headers hdr,
                 exit;
             }
             if (polymorphic_destination.apply().hit) {
-                // M6 hook: only adjudication_accept==1 may be restored here.
-                // M5 still drops every copy, retaining the winner metadata.
-                hold_polymorphic();
+                if (meta.adjudication_accept == 1) {
+                    restore_polymorphic();
+                } else {
+                    hold_polymorphic();
+                }
             }
         }
 
