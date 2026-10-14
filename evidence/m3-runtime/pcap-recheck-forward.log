@@ -1,0 +1,3 @@
+PCAP_CHECK_OK direction=0 per_port=1 copies=3
+sequence=1 source_crc32=0xee6384ce
+Source captures checked; M4 encapsulation and end-to-end delivery are NOT checked.
