@@ -34,9 +34,9 @@ def controller_entries(helper):
 
 
 class OfflineSwitch(OfflineIngress):
-    def __init__(self, program, wire, helper, entries, port=1, registers=None):
+    def __init__(self, program, wire, helper, entries, port=1, registers=None, state=None):
         self.helper, self.entries = helper, entries
-        super().__init__(program, wire, port=port, registers=registers)
+        super().__init__(program, wire, port=port, registers=registers, state=state)
 
     def configured_action(self, table):
         if not table['key']:
@@ -341,17 +341,20 @@ class M4Checks(unittest.TestCase):
             direction = int(name == 's1')
             self.assertEqual(actual, {(2, direction, 1), (3, direction, 2), (4, direction, 3)})
             for entry in destinations:
-                self.assertEqual(self.helper.get_actions_name(entry.action.action.action_id), 'MyIngress.hold_polymorphic')
+                self.assertEqual(self.helper.get_actions_name(entry.action.action.action_id),
+                                 'MyIngress.hold_polymorphic' if entry.is_default_action
+                                 else 'MyIngress.adjudicate_polymorphic')
         old = subprocess.check_output(['git', '--git-dir=.course-git', '--work-tree=.', 'show',
                                        'd7284f6:polymorphic.p4'], cwd=ROOT, text=True)
         new = (ROOT / 'polymorphic.p4').read_text()
-        for start, end in [('register<bit<32>>(2) sequence_register;', '    action srcRoute_nhop()'),
+        self.assertIn('register<bit<32>>(2) sequence_register;', new)
+        for start, end in [('action start_polymorphic(', '    // M4 landing point'),
                            ('// M3: fixed Ethernet/IPv4/UDP input only', '// TODO M5:')]:
             a, b = old[old.index(start):], new[new.index(start):]
             # Destination table is inserted after prepare_polymorphic only.
-            if start.startswith('register'):
-                a = a[:a.index(end)]
-                b = b[:b.index('    // M4 landing point')]
+            if start.startswith('action start'):
+                a = a[:a.index('    action srcRoute_nhop()')]
+                b = b[:b.index('    action adjudicate_polymorphic()')]
             else:
                 a, b = a[:a.index(end)], b[:b.index(end)]
             self.assertEqual(a.rstrip(), b.rstrip())

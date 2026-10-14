@@ -30,13 +30,19 @@ from p4.config.v1 import p4info_pb2
 
 class OfflineIngress(OfflineParser):
     """Interpret only the emitted operations used by M3; fail on unknown ones."""
-    def __init__(self, program, wire, port=1, registers=None, rules=None):
+    def __init__(self, program, wire, port=1, registers=None, rules=None, state=None):
         super().__init__(program, wire)
         self.widths = {(h, f[0]): f[1] for h, fs in self.layouts.items() for f in fs}
         self.fields.update({ref: 0 for ref in self.widths})
         self.fields['standard_metadata', 'ingress_port'] = port
         self.fields['standard_metadata', 'packet_length'] = len(wire)
-        self.registers = registers if registers is not None else [0, 0]
+        self.state = state if state is not None else {
+            'registers': {r['name']: [0] * r['size'] for r in program['register_arrays']},
+            'counters': {c['name']: [0] * c['size'] for c in program['counter_arrays']},
+        }
+        self.registers = registers if registers is not None else \
+            self.state['registers']['MyIngress.sequence_register']
+        self.state['registers']['MyIngress.sequence_register'] = self.registers
         self.rules = rules if rules is not None else {(1, 0x0a000202, 5000): 0}
         self.actions = {a['id']: a for a in program['actions']}
         self.runtime_data = []
@@ -64,7 +70,8 @@ class OfflineIngress(OfflineParser):
                 return int(not right)
             operations = {'or': lambda a, b: int(bool(a) or bool(b)),
                           '!=': operator.ne, '>': operator.gt, '<': operator.lt,
-                          '>=': operator.ge, '+': operator.add}
+                          '>=': operator.ge, '+': operator.add, '-': operator.sub,
+                          '|': operator.or_, '<<': operator.lshift}
             if op in operations:
                 return int(operations[op](self.evaluate(expr['left']), right))
         return super().evaluate(node)
@@ -83,8 +90,21 @@ class OfflineIngress(OfflineParser):
     def execute(self, action_id, data):
         action = self.actions[action_id]
         self.runtime_data = data
-        for item in action['primitives']:
+        offset, steps = 0, 0
+        while offset < len(action['primitives']):
+            steps += 1
+            if steps > 4096:
+                raise ValueError('action did not terminate')
+            item = action['primitives'][offset]
+            offset += 1
             op, p = item['op'], item['parameters']
+            if op == '_jump':
+                offset = self.evaluate(p[0])
+                continue
+            if op == '_jump_if_zero':
+                if not self.evaluate(p[0]):
+                    offset = self.evaluate(p[1])
+                continue
             if op == 'exit':
                 return True
             if op == 'assign':
@@ -100,13 +120,11 @@ class OfflineIngress(OfflineParser):
                 self.fields['standard_metadata', 'egress_spec'] = 511
                 self.fields['standard_metadata', 'mcast_grp'] = 0
             elif op == 'register_read':
-                if p[1]['value'] != 'MyIngress.sequence_register':
-                    raise ValueError(p)
-                self.assign(p[0], self.registers[self.evaluate(p[2])])
+                self.assign(p[0], self.state['registers'][p[1]['value']][self.evaluate(p[2])])
             elif op == 'register_write':
-                if p[0]['value'] != 'MyIngress.sequence_register':
-                    raise ValueError(p)
-                self.registers[self.evaluate(p[1])] = self.evaluate(p[2])
+                self.state['registers'][p[0]['value']][self.evaluate(p[1])] = self.evaluate(p[2])
+            elif op == 'count':
+                self.state['counters'][p[0]['value']][self.evaluate(p[1])] += 1
             elif op == 'modify_field_with_hash_based_offset':
                 calc = next(c for c in self.program['calculations'] if c['name'] == p[2]['value'])
                 if calc['algo'] != 'crc32':

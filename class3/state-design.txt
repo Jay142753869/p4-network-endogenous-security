@@ -1,0 +1,108 @@
+M5 目的网关状态设计（M6 尚未接入）
+=================================
+
+1. 范围与入口
+保留 M4 的 polymorphic_destination 三个 exact key：ingress_port、direction、modality_id。
+S2 只安装 direction=0 的 (2,1)/(3,2)/(4,3)；S1 只安装 direction=1 的对应规则。
+精确命中 action=adjudicate_polymorphic；两个网关 default=hold_polymorphic。
+中间交换机 default=NoAction，不执行裁决。原有源调度、序号、PRE、Egress 不变。
+
+2. CRC
+observed_crc 从本次实际收到的 inner IPv4 srcAddr(32)、dstAddr(32)、protocol(8)、
+UDP srcPort(16)、dstPort(16)、protected_data.value(128) 依序拼接，共232 bit。
+HashAlgorithm.crc32，base=32w0，max=64w0x100000000，与 M3 相同。
+CRC-32/ISO-HDLC，初始余数/final XOR=0xffffffff，反射输入/输出。
+source_crc32 不进入投票，不作为 observed_crc 来源。
+
+3. 持久状态（各 BMv2 交换机本地独立）
+每个目的网关有1024项 window，slot=sequence_number & 1023。
+slot_valid[1]：区分未使用槽与合法 sequence=0。
+slot_direction[8]：槽所属方向；防止误配置混用方向。
+seq_tag[32]：完整序号标签。
+crc_candidate_1/2[32]、mode_candidate_1/2[8]：最多两个不同 CRC 候选及其模态。
+seen_modes[8]：仅使用低三位，mode1=1、mode2=2、mode3=4。
+candidate_counts[2]：已保存候选的数量0/1/2，不是累计票数。
+decided[1]：是否已经作出终局决定。
+decision_status[2]：0=PENDING，1=MAJORITY，2=NO_MAJORITY。
+decided_crc[32]：多数 CRC；无多数时为0，由 status 区分合法 CRC=0。
+另有 latest_valid[2]、latest_sequence[2]，按方向保存最新已接纳的序号。
+S1/S2 各管理一个目的方向，不共享 register。不是单台交换机同时承载双向窗口。
+
+4. 防迟到覆盖与窗口复用
+在同一原子 action 中读取高水位与 slot，计算32位模运算：
+delta = current - latest；age = latest - current。
+latest尚无效：允许第一份任意32位序号。
+0 < delta < 2^31：current 比 latest 新，允许并在接纳后推进 latest。
+delta=0：同序号，继续本组状态。
+delta>=2^31：仅 age<1024 的乱序副本可进入；age>=1024 丢弃。
+恰好相差2^31的序号有歧义，丢弃。
+方向与已有槽 owner 不符也丢弃，不修改高水位、候选或统计。
+
+通过 freshness 后，若 slot_valid=0 或 seq_tag!=current，才初始化：
+valid=1、direction=current.direction、tag=current.sequence；
+两个 CRC/候选模态/seen/count/decided/winner 全部清零，status=PENDING。
+因此 sequence=1 与1025可正常复用槽1，随后迟到的1不能把槽重置回去。
+即使旧包映射的槽还未使用，也受高水位限制，不能在窗口之外重新开启一组。
+允许跨度不足1024的真实乱序，已经投过票的旧组在窗口内仍由seen/decided去重。
+
+5. 状态转移顺序
+每包入口先令 adjudication_accept=0。
+只在目的精确规则中计算 observed_crc 并进入原子事务。
+事务：读高水位和槽 -> freshness -> 必要时初始化 -> seen检查 -> 候选/终局 -> 统计 -> 写回。
+seen已有当前模态：不写任何register、不记任何counter，之后安全丢弃。
+未见当前模态：先置位seen，再按如下逻辑处理。
+
+PENDING且count=0：保存crc1/mode1，count=1，accept=0。
+PENDING且count=1：
+  observed==crc1：status=MAJORITY、decided=1、winner=observed、accept=1。
+  observed!=crc1：保存crc2/mode2，count=2，accept=0。
+PENDING且count=2：
+  observed匹配任一候选：status=MAJORITY、decided=1、winner=observed、accept=1。
+  两个都不匹配：status=NO_MAJORITY、decided=1、winner=0、no_majority_count[0]加1。
+已MAJORITY：新模态只比较winner记good/bad，accept保持0。
+已NO_MAJORITY：不再投票/输出；三模态已见，后续实际只会落入重复分支。
+只在进入NO_MAJORITY的那次转移计数，所以它恰好一次。
+
+6. 统计（接口保持官方名称与尺寸）
+good_count(5,packets)、bad_count(5,packets)：只使用索引1/2/3，索引0/4不写。
+no_majority_count(1,packets)：索引0。
+首次形成多数：补记crc1/mode1，若count=2也补记crc2/mode2；与winner相等记good，否则bad。
+触发多数的当前副本一定与winner相等，记当前mode的good。
+多数后的新模态单独对winner记一次good/bad；重复模态完全不计。
+未出现模态不因缺失被记bad。无多数没有确定winner，不给三个模态随意标good/bad。
+
+输入模式 -> 胜出标记时机 -> 最终统计
+A,A,A -> 第二份accept=1 -> 三模态good各1。
+A,A,B -> 第二份accept=1 -> 两A good，B bad。
+A,B,B -> 第三份accept=1 -> A bad，两B good。
+A,B,C -> 从不accept -> no_majority=1，good/bad均0。
+A,A,缺失 -> 第二份accept=1 -> 两到达模态good，缺失模态无计数。
+A(mode1),A(mode1),B(mode2) -> 无accept -> count=2、seen=3、无good/bad。
+不假设mode1先到；mode的任何排列都走相同规则。
+
+7. 原子性
+所有14个M5 register数组的读取、比较、更新、counter补记都在一个action内的@atomic块中。
+p4c将分支生成为同一个JSON action内的_jump/_jump_if_zero，而非跨多个pipeline action读写。
+本机BMv2 ActionFnEntry在执行整个action前取得该action访问的所有register数组锁，执行后释放。
+所以高水位、初始化、seen、decided及其统计触发在本目标上属于同一事务。
+锁粒度是数组，性能上会串行化本机各槽的裁决；不将此实现宣称为任意硬件目标保证。
+编译无atomic不支持警告；实际并发压力测试尚未运行。
+
+8. 重启、回绕和边界
+BMv2冷启动/流水线重装把register、counter清零；源与目的需一起建立新会话。
+源独自重启但目的仍保留旧状态时，新低序号可能被当成重复或过旧而丢弃，不自动清空目的窗口。
+32位序号可从0xffffffff回绕到0；使用slot_valid和模序比较正确处理该边界。
+要求有效序号推进与报文滞留跨度小于2^31；整个32位空间之外的旧epoch无法仅凭32位字段识别。
+窗口之外的迟到第三模态丢弃，不再补计该历史组的统计；这是有限窗口的明确界限。
+未实现超时、持久化、源重启epoch协商、完整包缓存或密码学认证。
+
+9. M6钩子与当前输出
+action只在当前副本首次形成多数时令meta.adjudication_accept=1。
+polymorphic_destination精确命中返回后，Ingress保留该标记但仍调用hold_polymorphic丢弃。
+不删outer/PolyShim、不改inner、不改MAC到主机、不设置主机出口。
+M6后续只在此处accept=1时接入透明还原，其他情况继续drop；不得再进入普通SR/IPv4路由。
+
+10. 验证区分
+tests/check_m5.py解释编译JSON并模拟CRC/register/counter；含错误数据、重复、顺序、窗口和回绕。
+实际M4目的入口pcap离线重放也只是JSON解释器测试，不是M5真实BMv2验证。
+当前会话真实M5网络运行尚未进行；普通IPv6反向及SR双向真实回归仍待补充。

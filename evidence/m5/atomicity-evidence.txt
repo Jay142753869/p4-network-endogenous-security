@@ -1,0 +1,40 @@
+Compiled vote action primitive count: 139
+Register arrays referenced in this one action:
+MyIngress.candidate_counts
+MyIngress.crc_candidate_1
+MyIngress.crc_candidate_2
+MyIngress.decided
+MyIngress.decided_crc
+MyIngress.decision_status
+MyIngress.latest_sequence
+MyIngress.latest_valid
+MyIngress.mode_candidate_1
+MyIngress.mode_candidate_2
+MyIngress.seen_modes
+MyIngress.seq_tag
+MyIngress.slot_direction
+MyIngress.slot_valid
+
+Local BMv2 source: /home/p4/src/behavioral-model/src/bm_sim/actions.cpp
+ActionFnEntry::operator()(Packet *pkt) const {
+  if (!action_fn) return;  // empty action
+  BMELOG(action_execute, *pkt, *action_fn, action_data);
+  // TODO(antonin)
+  // this is temporary while we experiment with the debugger
+  DEBUGGER_NOTIFY_CTR(
+      Debugger::PacketId::make(pkt->get_packet_id(), pkt->get_copy_id()),
+      DBG_CTR_ACTION | action_fn->get_id());
+
+  {
+    RegisterSync::RegisterLocks RL;
+    action_fn->register_sync.lock(&RL);
+    execute(pkt);
+  }
+
+  DEBUGGER_NOTIFY_CTR(
+      Debugger::PacketId::make(pkt->get_packet_id(), pkt->get_copy_id()),
+      DBG_CTR_EXIT(DBG_CTR_ACTION) | action_fn->get_id());
+}
+
+
+Static target-specific lock evidence, not a runtime concurrency stress test.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Ordinary forwarding, M3 scheduling and M4 destination holding rules.
+"""Ordinary forwarding, M3 scheduling and M5 destination adjudication rules.
 
-M5 adjudication and M6 restoration are still unimplemented.
+M6 restoration is still unimplemented; winners remain safely dropped.
 """
 
 import argparse
@@ -55,7 +55,7 @@ def writePolymorphicScheduleRule(p4info_helper, switch, destination,
 
 def writePolymorphicDestinationRule(p4info_helper, switch, packet_direction,
                                      ingress_port, modality_id):
-    """M4: hold one arriving modality before any host-facing forwarding."""
+    """Select M5 adjudication for one valid arriving modality at its gateway."""
     if packet_direction not in (0, 1) or (ingress_port, modality_id) not in POLY_REPLICAS:
         raise ValueError("invalid destination direction or port/modality pair")
     entry = p4info_helper.buildTableEntry(
@@ -65,7 +65,7 @@ def writePolymorphicDestinationRule(p4info_helper, switch, packet_direction,
             "hdr.poly.direction": packet_direction,
             "hdr.poly.modality_id": modality_id,
         },
-        action_name="MyIngress.hold_polymorphic",
+        action_name="MyIngress.adjudicate_polymorphic",
     )
     switch.WriteTableEntry(entry)
 
@@ -222,7 +222,7 @@ def main(p4info_file_path, bmv2_file_path):
         writeIpv6_lpmRules(p4info_helper, s21, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:00", "port": 1})
         writeIpv6_lpmRules(p4info_helper, s1, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:01", "port": 1})
 
-        # Hold all three modalities at their destination before enabling input.
+        # Enable adjudication for all three destination arrivals before input.
         # Intermediate switches receive no destination-gateway rules.
         for gateway in (s1, s2):
             # Fail closed at gateways if an exact arrival rule is absent.
@@ -243,7 +243,7 @@ def main(p4info_file_path, bmv2_file_path):
         writePolymorphicScheduleRule(p4info_helper, s1, "10.0.2.2", 0)
         writePolymorphicScheduleRule(p4info_helper, s2, "10.0.1.1", 1)
 
-        # TODO M5-M6: destination roles, adjudication and restoration.
+        # TODO M6: restore only the current copy that first forms a majority.
         # Fault injection is deliberately left to a later stage.
         
 

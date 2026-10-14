@@ -23,6 +23,11 @@ const bit<16> ARP_OPER_REQUEST   = 1;
 const bit<16> ARP_OPER_REPLY     = 2;
 
 #define MAX_HOPS 9
+#define STATE_SLOTS 1024
+
+const bit<2> VOTE_PENDING = 0;
+const bit<2> VOTE_MAJORITY = 1;
+const bit<2> VOTE_NO_MAJORITY = 2;
 
 error {
     InvalidPolyShim,
@@ -147,7 +152,28 @@ struct metadata {
     bit<1>      scheduled;
     bit<8>      packet_direction;
     bit<32>     sequence_number;
-    // TODO M5-M6: add destination state and restore metadata.
+    bit<1>      adjudication_accept; // M6 hook: only the deciding current copy
+    // Per-packet scratch only; persistent state is in MyIngress registers.
+    bit<32> vote_slot;
+    bit<32> vote_observed_crc;
+    bit<32> vote_newest;
+    bit<1>  vote_newest_valid;
+    bit<32> vote_delta;
+    bit<32> vote_age;
+    bit<1>  vote_admissible;
+    bit<1>  vote_valid;
+    bit<8>  vote_direction;
+    bit<32> vote_tag;
+    bit<32> vote_crc1;
+    bit<32> vote_crc2;
+    bit<8>  vote_mode1;
+    bit<8>  vote_mode2;
+    bit<8>  vote_seen;
+    bit<8>  vote_mode_bit;
+    bit<2>  vote_candidates;
+    bit<1>  vote_decided;
+    bit<2>  vote_status;
+    bit<32> vote_winner;
 }
 
 struct headers {
@@ -301,6 +327,27 @@ control MyIngress(inout headers hdr,
     // each switch owns its own array. Store the last allocated sequence.
     register<bit<32>>(2) sequence_register;
 
+    register<bit<1>>(STATE_SLOTS) slot_valid;
+    register<bit<8>>(STATE_SLOTS) slot_direction;
+    register<bit<32>>(STATE_SLOTS) seq_tag;
+    register<bit<32>>(STATE_SLOTS) crc_candidate_1;
+    register<bit<32>>(STATE_SLOTS) crc_candidate_2;
+    register<bit<8>>(STATE_SLOTS) mode_candidate_1;
+    register<bit<8>>(STATE_SLOTS) mode_candidate_2;
+    register<bit<8>>(STATE_SLOTS) seen_modes;
+    register<bit<2>>(STATE_SLOTS) candidate_counts;
+    register<bit<1>>(STATE_SLOTS) decided;
+    register<bit<2>>(STATE_SLOTS) decision_status;
+    register<bit<32>>(STATE_SLOTS) decided_crc;
+    // Each switch is one destination direction; these two entries also keep
+    // serial-number freshness checks explicitly separated by direction.
+    register<bit<32>>(2) latest_sequence;
+    register<bit<1>>(2) latest_valid;
+
+    counter(5, CounterType.packets) good_count;
+    counter(5, CounterType.packets) bad_count;
+    counter(1, CounterType.packets) no_majority_count;
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
@@ -357,8 +404,146 @@ control MyIngress(inout headers hdr,
         standard_metadata.mcast_grp = POLY_MCAST_GROUP;
     }
 
-    // M4 landing point for M5: match the gateway, direction and arrival
-    // modality before ordinary routing/SR termination. No voting yet.
+    action adjudicate_polymorphic() {
+        // Recompute from the received inner bytes; source_crc32 is never read.
+        hash(meta.vote_observed_crc, HashAlgorithm.crc32, (bit<32>)0,
+             { hdr.inner_ipv4.srcAddr,
+               hdr.inner_ipv4.dstAddr,
+               hdr.inner_ipv4.protocol,
+               hdr.udp.srcPort,
+               hdr.udp.dstPort,
+               hdr.protected_data.value },
+             (bit<64>)0x100000000);
+        meta.vote_slot = hdr.poly.sequence_number & 1023;
+        meta.vote_mode_bit = (bit<8>)(8w1 << (hdr.poly.modality_id - 1));
+        // One BMv2 action holds all register locks across reads, branching,
+        // writes and counter accounting. Never split this transaction.
+        @atomic {
+            latest_sequence.read(meta.vote_newest, (bit<32>)hdr.poly.direction);
+            latest_valid.read(meta.vote_newest_valid, (bit<32>)hdr.poly.direction);
+            slot_valid.read(meta.vote_valid, meta.vote_slot);
+            slot_direction.read(meta.vote_direction, meta.vote_slot);
+            seq_tag.read(meta.vote_tag, meta.vote_slot);
+            crc_candidate_1.read(meta.vote_crc1, meta.vote_slot);
+            crc_candidate_2.read(meta.vote_crc2, meta.vote_slot);
+            mode_candidate_1.read(meta.vote_mode1, meta.vote_slot);
+            mode_candidate_2.read(meta.vote_mode2, meta.vote_slot);
+            seen_modes.read(meta.vote_seen, meta.vote_slot);
+            candidate_counts.read(meta.vote_candidates, meta.vote_slot);
+            decided.read(meta.vote_decided, meta.vote_slot);
+            decision_status.read(meta.vote_status, meta.vote_slot);
+            decided_crc.read(meta.vote_winner, meta.vote_slot);
+
+            meta.vote_delta = hdr.poly.sequence_number - meta.vote_newest;
+            meta.vote_age = meta.vote_newest - hdr.poly.sequence_number;
+            meta.vote_admissible = 1;
+            // Serial-number arithmetic: half-range is ambiguous and rejected;
+            // out-of-order copies are accepted only within the latest 1024.
+            if (meta.vote_newest_valid == 1 &&
+                meta.vote_delta >= 0x80000000 && meta.vote_age >= STATE_SLOTS) {
+                meta.vote_admissible = 0;
+            }
+            // A switch is configured for one destination direction. Refuse
+            // cross-direction slot reuse even under a bad role configuration.
+            if (meta.vote_valid == 1 && meta.vote_direction != hdr.poly.direction) {
+                meta.vote_admissible = 0;
+            }
+            if (meta.vote_admissible == 1) {
+                if (meta.vote_valid == 0 || meta.vote_tag != hdr.poly.sequence_number) {
+                    meta.vote_valid = 1;
+                    meta.vote_direction = hdr.poly.direction;
+                    meta.vote_tag = hdr.poly.sequence_number;
+                    meta.vote_crc1 = 0;
+                    meta.vote_crc2 = 0;
+                    meta.vote_mode1 = 0;
+                    meta.vote_mode2 = 0;
+                    meta.vote_seen = 0;
+                    meta.vote_candidates = 0;
+                    meta.vote_decided = 0;
+                    meta.vote_status = VOTE_PENDING;
+                    meta.vote_winner = 0;
+                }
+                // Duplicate modes never write state or account statistics.
+                if ((meta.vote_seen & meta.vote_mode_bit) == 0) {
+                    meta.vote_seen = meta.vote_seen | meta.vote_mode_bit;
+                    if (meta.vote_status == VOTE_PENDING) {
+                        if (meta.vote_candidates == 0) {
+                            meta.vote_crc1 = meta.vote_observed_crc;
+                            meta.vote_mode1 = hdr.poly.modality_id;
+                            meta.vote_candidates = 1;
+                        } else if (meta.vote_candidates == 1) {
+                            if (meta.vote_observed_crc == meta.vote_crc1) {
+                                meta.vote_decided = 1;
+                                meta.vote_status = VOTE_MAJORITY;
+                                meta.vote_winner = meta.vote_observed_crc;
+                                meta.adjudication_accept = 1;
+                            } else {
+                                meta.vote_crc2 = meta.vote_observed_crc;
+                                meta.vote_mode2 = hdr.poly.modality_id;
+                                meta.vote_candidates = 2;
+                            }
+                        } else {
+                            meta.vote_decided = 1;
+                            if (meta.vote_observed_crc == meta.vote_crc1 ||
+                                meta.vote_observed_crc == meta.vote_crc2) {
+                                meta.vote_status = VOTE_MAJORITY;
+                                meta.vote_winner = meta.vote_observed_crc;
+                                meta.adjudication_accept = 1;
+                            } else {
+                                meta.vote_status = VOTE_NO_MAJORITY;
+                                meta.vote_winner = 0;
+                                no_majority_count.count(0);
+                            }
+                        }
+                    }
+                    if (meta.adjudication_accept == 1) {
+                        // Account the earlier candidates exactly once when
+                        // the winner becomes known, not at candidate arrival.
+                        if (meta.vote_crc1 == meta.vote_winner) {
+                            good_count.count((bit<32>)meta.vote_mode1);
+                        } else {
+                            bad_count.count((bit<32>)meta.vote_mode1);
+                        }
+                        if (meta.vote_candidates == 2) {
+                            if (meta.vote_crc2 == meta.vote_winner) {
+                                good_count.count((bit<32>)meta.vote_mode2);
+                            } else {
+                                bad_count.count((bit<32>)meta.vote_mode2);
+                            }
+                        }
+                        good_count.count((bit<32>)hdr.poly.modality_id);
+                    } else if (meta.vote_status == VOTE_MAJORITY) {
+                        // New, late third mode: statistics only, no accept.
+                        if (meta.vote_observed_crc == meta.vote_winner) {
+                            good_count.count((bit<32>)hdr.poly.modality_id);
+                        } else {
+                            bad_count.count((bit<32>)hdr.poly.modality_id);
+                        }
+                    }
+                    slot_valid.write(meta.vote_slot, meta.vote_valid);
+                    slot_direction.write(meta.vote_slot, meta.vote_direction);
+                    seq_tag.write(meta.vote_slot, meta.vote_tag);
+                    crc_candidate_1.write(meta.vote_slot, meta.vote_crc1);
+                    crc_candidate_2.write(meta.vote_slot, meta.vote_crc2);
+                    mode_candidate_1.write(meta.vote_slot, meta.vote_mode1);
+                    mode_candidate_2.write(meta.vote_slot, meta.vote_mode2);
+                    seen_modes.write(meta.vote_slot, meta.vote_seen);
+                    candidate_counts.write(meta.vote_slot, meta.vote_candidates);
+                    decided.write(meta.vote_slot, meta.vote_decided);
+                    decision_status.write(meta.vote_slot, meta.vote_status);
+                    decided_crc.write(meta.vote_slot, meta.vote_winner);
+                    if (meta.vote_newest_valid == 0 ||
+                        (meta.vote_delta != 0 && meta.vote_delta < 0x80000000)) {
+                        latest_sequence.write((bit<32>)hdr.poly.direction,
+                                              hdr.poly.sequence_number);
+                        latest_valid.write((bit<32>)hdr.poly.direction, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Fail closed for unmatched gateway arrivals and, until M6, all decisions.
     action hold_polymorphic() {
         mark_to_drop(standard_metadata);
         exit;
@@ -371,6 +556,7 @@ control MyIngress(inout headers hdr,
             hdr.poly.modality_id: exact;
         }
         actions = {
+            adjudicate_polymorphic;
             hold_polymorphic;
             NoAction;
         }
@@ -460,6 +646,7 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
+        meta.adjudication_accept = 0;
         // Parser rejection on v1model does not automatically drop a packet.
         if (standard_metadata.parser_error != error.NoError) {
             drop();
@@ -500,7 +687,9 @@ control MyIngress(inout headers hdr,
                 exit;
             }
             if (polymorphic_destination.apply().hit) {
-                exit; // M4: matched copies are held/dropped, never host output
+                // M6 hook: only adjudication_accept==1 may be restored here.
+                // M5 still drops every copy, retaining the winner metadata.
+                hold_polymorphic();
             }
         }
 
