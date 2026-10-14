@@ -1,0 +1,36 @@
+VERIFIED_DATE=2026-08-28
+REFERENCE_COMMIT=376cd66
+
+SCENARIO_PASS no-fault
+SCENARIO_PASS reverse
+SCENARIO_PASS corrupt-mode1
+SCENARIO_PASS drop-mode2
+SCENARIO_PASS no-majority
+ALL_SCENARIOS_PASS 5
+
+manual reverse-corrupt-mode1: PASS
+received=1 expected=1
+s1 mode1_good=0 mode1_bad=1 mode2_good=1 mode2_bad=0 mode3_good=1 mode3_bad=0 no_majority=0
+
+no-fault:
+received=1 expected=1
+mode1_good=1 mode1_bad=0
+mode2_good=1 mode2_bad=0
+mode3_good=1 mode3_bad=0
+no_majority=0
+
+corrupt-mode1:
+received=1 expected=1
+mode1_good=0 mode1_bad=1
+mode2_good=1 mode2_bad=0
+mode3_good=1 mode3_bad=0
+no_majority=0
+
+drop-mode2:
+received=1 expected=1
+mode1_good=1 mode2_good=0 mode3_good=1
+no_majority=0
+
+no-majority:
+received=0 expected=0
+no_majority=1

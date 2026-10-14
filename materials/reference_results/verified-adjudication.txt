@@ -1,0 +1,12 @@
+VERIFIED_DATE=2026-08-28
+
+Python adjudication model: PASS
+no-fault: output=1, mode1/2/3 good=1
+corrupt-mode1: output=1 correct, mode1 bad=1, mode2/3 good=1
+drop-mode2: output=1 correct, mode1/3 good=1, mode2 no arrival
+no-majority: output=0, no_majority=1
+
+integrated P4 reference:
+h1->h2 no-fault: received=1 expected=1, correct content
+h2->h1 no-fault: received=1 expected=1, correct content
+late third modality: counters updated, duplicate host output=0

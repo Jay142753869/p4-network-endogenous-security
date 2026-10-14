@@ -1,0 +1,16 @@
+VERIFIED_DATE=2026-08-28
+
+student starter P4 compile: PASS
+student starter Python syntax: PASS
+
+mapping model:
+INPUT count=1 sequence=1 protected_hex=636c617373322d746573740000000000
+REPLICA egress_port=2 modality_id=1 encapsulation=IPv4 sequence=1 path=s1-s11-s12-s2
+REPLICA egress_port=3 modality_id=2 encapsulation=IPv6 sequence=1 path=s1-s21-s22-s2
+REPLICA egress_port=4 modality_id=3 encapsulation=SourceRouting sequence=1 path=s1-s31-s32-s2
+SUMMARY input=1 replicas=3 same_sequence=yes
+
+integrated reference pcap:
+s1-eth2_out: outer IPv4 protocol 253
+s1-eth3_out: outer IPv6 next-header 253
+s1-eth4_out: EtherType 0x1234
