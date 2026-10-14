@@ -1,0 +1,59 @@
+OFFLINE ONLY: JSON interpretation, Python checksum model and synthetic hop traces.
+test_destination_configuration_and_m3_source_preservation (__main__.M4Checks.test_destination_configuration_and_m3_source_preservation) ... ok
+test_invalid_exit_instance_direction_and_incomplete_headers (__main__.M4Checks.test_invalid_exit_instance_direction_and_incomplete_headers) ... ok
+test_missing_destination_rules_fail_closed (__main__.M4Checks.test_missing_destination_rules_fail_closed) ... FAIL
+test_ordinary_forwarding_and_sr_distinction (__main__.M4Checks.test_ordinary_forwarding_and_sr_distinction) ... ok
+test_six_encapsulations_validity_lengths_and_immutable_inner (__main__.M4Checks.test_six_encapsulations_validity_lengths_and_immutable_inner) ... ok
+test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) ... 
+  test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=1) ... FAIL
+  test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=2) ... FAIL
+  test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=3) ... FAIL
+
+======================================================================
+FAIL: test_missing_destination_rules_fail_closed (__main__.M4Checks.test_missing_destination_rules_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 228, in test_missing_destination_rules_fail_closed
+    frame = self.trace(direction, mode)[-1]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 195, in trace
+    self.assertFalse(p.dropped)
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 214, in test_six_multi_hop_paths_and_gateway_interception
+    packets = [decode(f) for f in self.trace(direction, mode)]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 195, in trace
+    self.assertFalse(p.dropped)
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 214, in test_six_multi_hop_paths_and_gateway_interception
+    packets = [decode(f) for f in self.trace(direction, mode)]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 195, in trace
+    self.assertFalse(p.dropped)
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) (direction=1, mode=3)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 214, in test_six_multi_hop_paths_and_gateway_interception
+    packets = [decode(f) for f in self.trace(direction, mode)]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m4.py", line 195, in trace
+    self.assertFalse(p.dropped)
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.112s
+
+FAILED (failures=4)

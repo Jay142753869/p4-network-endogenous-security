@@ -151,15 +151,21 @@ class OfflineIngress(OfflineParser):
             entry = table['default_entry']
             action_id = entry['action_id']
             data = [int(x, 16) for x in entry['action_data']]
+            hit = False
             if node == 'MyIngress.polymorphic_schedule':
                 key = tuple(self.fields[tuple(k['target'])] for k in table['key'])
                 if key in self.rules:
+                    hit = True
                     action_id = next(i for i in table['action_ids']
                                      if self.actions[i]['name'] == 'MyIngress.start_polymorphic')
                     data = [self.rules[key]]
             if self.execute(action_id, data):
                 return self
-            node = table['next_tables'][self.actions[action_id]['name']]
+            # M4 adds a table.apply().hit branch. BMv2 JSON represents its
+            # successors with __HIT__/__MISS__ rather than action names.
+            successors = table['next_tables']
+            node = successors['__HIT__' if hit else '__MISS__'] if '__HIT__' in successors \
+                else successors[self.actions[action_id]['name']]
         raise ValueError('Ingress did not terminate')
 
 
@@ -368,12 +374,16 @@ class M3Checks(unittest.TestCase):
         ordinary = {h.get_tables_id('MyIngress.ipv4_lpm'): 0,
                     h.get_tables_id('MyIngress.ipv6_lpm'): 0,
                     h.get_tables_id('MyIngress.arp_match'): 0}
+        destination_counts = {'s1': 0, 's2': 0}
+        destination_defaults = {'s1': 0, 's2': 0}
         for name, switch in switches.items():
             pre, schedules = [], []
             for request in switch.requests:
                 self.assertEqual(request.device_id, switch.device_id)
                 self.assertEqual(request.election_id.low, 1)
-                self.assertEqual(request.updates[0].type, p4runtime_pb2.Update.INSERT)
+                is_default = request.updates[0].entity.table_entry.is_default_action
+                self.assertEqual(request.updates[0].type, p4runtime_pb2.Update.MODIFY
+                                 if is_default else p4runtime_pb2.Update.INSERT)
                 # Exercise serialization of actual protobufs, not dict stubs.
                 restored = p4runtime_pb2.WriteRequest.FromString(request.SerializeToString())
                 entity = restored.updates[0].entity
@@ -383,6 +393,12 @@ class M3Checks(unittest.TestCase):
                     entry = entity.table_entry
                     if entry.table_id == table.preamble.id:
                         schedules.append(entry)
+                    elif entry.table_id == h.get_tables_id('MyIngress.polymorphic_destination'):
+                        self.assertIn(name, destination_counts)
+                        if entry.is_default_action:
+                            destination_defaults[name] += 1
+                        else:
+                            destination_counts[name] += 1
                     else:
                         ordinary[entry.table_id] += 1
             if name in ('s1', 's2'):
@@ -402,6 +418,8 @@ class M3Checks(unittest.TestCase):
             else:
                 self.assertEqual((pre, schedules), ([], []))
         self.assertEqual(sorted(ordinary.values()), [2, 8, 8])
+        self.assertEqual(destination_counts, {'s1': 3, 's2': 3})
+        self.assertEqual(destination_defaults, {'s1': 1, 's2': 1})
         with self.assertRaises(ValueError):
             controller.writePolymorphicScheduleRule(h, switches['s1'], '10.0.2.2', 2)
 

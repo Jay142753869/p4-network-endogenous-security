@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Ordinary forwarding plus M3 source scheduling and P4Runtime multicast.
+"""Ordinary forwarding, M3 scheduling and M4 destination holding rules.
 
-M4 encapsulation and M5/M6 destination processing are still unimplemented.
+M5 adjudication and M6 restoration are still unimplemented.
 """
 
 import argparse
@@ -49,6 +49,23 @@ def writePolymorphicScheduleRule(p4info_helper, switch, destination,
         },
         action_name="MyIngress.start_polymorphic",
         action_params={"packet_direction": packet_direction},
+    )
+    switch.WriteTableEntry(entry)
+
+
+def writePolymorphicDestinationRule(p4info_helper, switch, packet_direction,
+                                     ingress_port, modality_id):
+    """M4: hold one arriving modality before any host-facing forwarding."""
+    if packet_direction not in (0, 1) or (ingress_port, modality_id) not in POLY_REPLICAS:
+        raise ValueError("invalid destination direction or port/modality pair")
+    entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.polymorphic_destination",
+        match_fields={
+            "standard_metadata.ingress_port": ingress_port,
+            "hdr.poly.direction": packet_direction,
+            "hdr.poly.modality_id": modality_id,
+        },
+        action_name="MyIngress.hold_polymorphic",
     )
     switch.WriteTableEntry(entry)
 
@@ -204,6 +221,20 @@ def main(p4info_file_path, bmv2_file_path):
         writeIpv6_lpmRules(p4info_helper, s22, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:11:00", "port": 1})
         writeIpv6_lpmRules(p4info_helper, s21, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:00", "port": 1})
         writeIpv6_lpmRules(p4info_helper, s1, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:01", "port": 1})
+
+        # Hold all three modalities at their destination before enabling input.
+        # Intermediate switches receive no destination-gateway rules.
+        for gateway in (s1, s2):
+            # Fail closed at gateways if an exact arrival rule is absent.
+            entry = p4info_helper.buildTableEntry(
+                table_name="MyIngress.polymorphic_destination",
+                default_action=True,
+                action_name="MyIngress.hold_polymorphic",
+            )
+            gateway.WriteTableEntry(entry)
+        for ingress_port, modality_id in ((2, 1), (3, 2), (4, 3)):
+            writePolymorphicDestinationRule(p4info_helper, s2, 0, ingress_port, modality_id)
+            writePolymorphicDestinationRule(p4info_helper, s1, 1, ingress_port, modality_id)
 
         # Install PRE before enabling either source schedule. Intermediate
         # switches retain only their original ordinary forwarding entries.

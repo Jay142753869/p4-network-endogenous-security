@@ -13,6 +13,7 @@ const bit<16> POLY_MAGIC        = 0x504f; // ASCII "PO"
 const bit<8>  POLY_IP_PROTOCOL  = 253;
 const bit<16> POLY_UDP_PORT     = 5000;
 const bit<16> POLY_MCAST_GROUP  = 10;
+const bit<32> INSTANCE_REPLICATION = 5; // BMv2 simple_switch PRE instance type
 
 const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
 const bit<16> ARP_PTYPE_IPV4     = 0x0800;
@@ -355,6 +356,29 @@ control MyIngress(inout headers hdr,
         hdr.poly.inner_ether_type = TYPE_IPV4;
         standard_metadata.mcast_grp = POLY_MCAST_GROUP;
     }
+
+    // M4 landing point for M5: match the gateway, direction and arrival
+    // modality before ordinary routing/SR termination. No voting yet.
+    action hold_polymorphic() {
+        mark_to_drop(standard_metadata);
+        exit;
+    }
+
+    table polymorphic_destination {
+        key = {
+            standard_metadata.ingress_port: exact;
+            hdr.poly.direction: exact;
+            hdr.poly.modality_id: exact;
+        }
+        actions = {
+            hold_polymorphic;
+            NoAction;
+        }
+        size = 16;
+        // The controller sets this to hold only on S1/S2. Intermediate
+        // reverse paths legitimately use egress port 1, so port != role.
+        default_action = NoAction();
+    }
     
     action srcRoute_nhop() {
         standard_metadata.egress_spec = (bit<9>)hdr.srcRoutes[0].port;
@@ -475,6 +499,9 @@ control MyIngress(inout headers hdr,
                 drop();
                 exit;
             }
+            if (polymorphic_destination.apply().hit) {
+                exit; // M4: matched copies are held/dropped, never host output
+            }
         }
 
         // M3: fixed Ethernet/IPv4/UDP input only, before ordinary routing can
@@ -506,6 +533,11 @@ control MyIngress(inout headers hdr,
         // termination / routing and emit at most one restored packet.
         if (hdr.srcRoutes[0].isValid()){
             if (hdr.srcRoutes[0].bos == 1){
+                if (hdr.poly.isValid()) {
+                    // Fail closed if a terminal SR destination rule is absent.
+                    drop();
+                    exit;
+                }
                 srcRoute_finish();
             }
             srcRoute_nhop();
@@ -533,14 +565,114 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
+    action clear_outer_headers() {
+        hdr.ipv4.setInvalid();
+        hdr.ipv6.setInvalid();
+        hdr.srcRoutes[0].setInvalid();
+        hdr.srcRoutes[1].setInvalid();
+        hdr.srcRoutes[2].setInvalid();
+        hdr.srcRoutes[3].setInvalid();
+        hdr.srcRoutes[4].setInvalid();
+        hdr.srcRoutes[5].setInvalid();
+        hdr.srcRoutes[6].setInvalid();
+        hdr.srcRoutes[7].setInvalid();
+        hdr.srcRoutes[8].setInvalid();
+    }
+
+    action encapsulate_ipv4(ip4Addr_t source, ip4Addr_t destination) {
+        hdr.ethernet.etherType = TYPE_IPV4;
+        hdr.poly.modality_id = 1;
+        hdr.ipv4.setValid();
+        hdr.ipv4.version = 4;
+        hdr.ipv4.ihl = 5;
+        hdr.ipv4.diffserv = 0;
+        hdr.ipv4.totalLen = 78;
+        hdr.ipv4.identification = 0;
+        hdr.ipv4.flags = 0;
+        hdr.ipv4.fragOffset = 0;
+        hdr.ipv4.ttl = 64;
+        hdr.ipv4.protocol = POLY_IP_PROTOCOL;
+        hdr.ipv4.hdrChecksum = 0; // MyComputeChecksum runs after Egress
+        hdr.ipv4.srcAddr = source;
+        hdr.ipv4.dstAddr = destination;
+    }
+
+    action encapsulate_ipv6(ip6Addr_t source, ip6Addr_t destination) {
+        hdr.ethernet.etherType = TYPE_IPV6;
+        hdr.poly.modality_id = 2;
+        hdr.ipv6.setValid();
+        hdr.ipv6.version = 6;
+        hdr.ipv6.trafficClass = 0;
+        hdr.ipv6.flowLabel = 0;
+        hdr.ipv6.payLoadLen = 58;
+        hdr.ipv6.nextHdr = POLY_IP_PROTOCOL;
+        hdr.ipv6.hopLimit = 64;
+        hdr.ipv6.srcAddr = source;
+        hdr.ipv6.dstAddr = destination;
+    }
+
+    action encapsulate_sr(bit<15> first_port, bit<15> second_port) {
+        hdr.ethernet.etherType = TYPE_SRCROUTING;
+        // Like the original SR sender, forwarding is entirely port-stack
+        // driven and the Ethernet destination is broadcast.
+        hdr.ethernet.dstAddr = 0xffffffffffff;
+        hdr.poly.modality_id = 3;
+        hdr.srcRoutes[0].setValid();
+        hdr.srcRoutes[0].bos = 0;
+        hdr.srcRoutes[0].port = first_port;
+        hdr.srcRoutes[1].setValid();
+        hdr.srcRoutes[1].bos = 0;
+        hdr.srcRoutes[1].port = second_port;
+        hdr.srcRoutes[2].setValid();
+        hdr.srcRoutes[2].bos = 1;
+        hdr.srcRoutes[2].port = 1;
+    }
+
     apply {
-        /*
-         * TODO M4: for scheduled multicast replicas, use egress_port to build:
-         *   2 -> outer IPv4, modality_id 1
-         *   3 -> outer IPv6, modality_id 2
-         *   4 -> Source Routing, modality_id 3
-         * All three replicas must retain one sequence number and one inner IPv4.
-         */
+        if (meta.scheduled == 1) {
+            if (standard_metadata.instance_type != INSTANCE_REPLICATION ||
+                !hdr.poly.isValid() || !hdr.inner_ipv4.isValid() ||
+                !hdr.udp.isValid() || !hdr.protected_data.isValid() ||
+                hdr.poly.direction > 1) {
+                mark_to_drop(standard_metadata);
+                exit;
+            }
+            clear_outer_headers();
+            // The next-hop MACs match the existing IPv4/IPv6 route actions.
+            if (hdr.poly.direction == 0) {
+                hdr.ethernet.srcAddr = 0x080000000100;
+                hdr.ethernet.dstAddr = 0x080000001100;
+            } else {
+                hdr.ethernet.srcAddr = 0x080000000200;
+                hdr.ethernet.dstAddr = 0x080000001200;
+            }
+            // PRE already selected the port; Egress only chooses its format.
+            if (standard_metadata.egress_port == 2) {
+                if (hdr.poly.direction == 0) {
+                    encapsulate_ipv4(0x0a000101, 0x0a000202);
+                } else {
+                    encapsulate_ipv4(0x0a000202, 0x0a000101);
+                }
+            } else if (standard_metadata.egress_port == 3) {
+                if (hdr.poly.direction == 0) {
+                    encapsulate_ipv6(0xfe800000000000000000000000001234,
+                                     0xfe800000000000000000000000005678);
+                } else {
+                    encapsulate_ipv6(0xfe800000000000000000000000005678,
+                                     0xfe800000000000000000000000001234);
+                }
+            } else if (standard_metadata.egress_port == 4) {
+                // Port 4 at the source gateway was already consumed by PRE.
+                // These are the remaining S31/S32/destination gateway ports.
+                if (hdr.poly.direction == 0) {
+                    encapsulate_sr(2, 2);
+                } else {
+                    encapsulate_sr(1, 1);
+                }
+            } else {
+                mark_to_drop(standard_metadata);
+            }
+        }
     }
 }
 

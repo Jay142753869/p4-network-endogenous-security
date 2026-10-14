@@ -1,0 +1,74 @@
+preamble {
+  id: 40478806
+  name: "MyIngress.polymorphic_schedule"
+  alias: "polymorphic_schedule"
+}
+match_fields {
+  id: 1
+  name: "standard_metadata.ingress_port"
+  bitwidth: 9
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.ipv4.dstAddr"
+  bitwidth: 32
+  match_type: EXACT
+}
+match_fields {
+  id: 3
+  name: "hdr.udp.dstPort"
+  bitwidth: 16
+  match_type: EXACT
+}
+action_refs {
+  id: 23035731
+}
+action_refs {
+  id: 21257015
+}
+const_default_action_id: 21257015
+initial_default_action {
+  action_id: 21257015
+}
+size: 16
+
+preamble {
+  id: 40492749
+  name: "MyIngress.polymorphic_destination"
+  alias: "polymorphic_destination"
+}
+match_fields {
+  id: 1
+  name: "standard_metadata.ingress_port"
+  bitwidth: 9
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.poly.direction"
+  bitwidth: 8
+  match_type: EXACT
+}
+match_fields {
+  id: 3
+  name: "hdr.poly.modality_id"
+  bitwidth: 8
+  match_type: EXACT
+}
+action_refs {
+  id: 26121529
+}
+action_refs {
+  id: 21257015
+}
+initial_default_action {
+  action_id: 21257015
+}
+size: 16
+
+preamble {
+  id: 26121529
+  name: "MyIngress.hold_polymorphic"
+  alias: "hold_polymorphic"
+}
