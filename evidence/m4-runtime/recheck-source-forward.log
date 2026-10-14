@@ -1,0 +1,4 @@
+M4_PCAP_OK scope=source direction=0 inputs=2 modalities=3
+sequence=1 source_crc32=0xd4c4087e
+sequence=2 source_crc32=0x71960faa
+Verified supplied capture contents; capture provenance must be recorded separately.
