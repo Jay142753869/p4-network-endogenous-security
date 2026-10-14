@@ -1,0 +1,8 @@
+Obtaining JSON from switch...
+Done
+Control utility for runtime P4 table manipulation
+RuntimeCmd: MyIngress.seq_tag[1]= 1
+RuntimeCmd: MyIngress.seen_modes[1]= 7
+RuntimeCmd: MyIngress.decision_status[1]= 1
+RuntimeCmd: MyIngress.decided_crc[1]= 1853104259
+RuntimeCmd: 

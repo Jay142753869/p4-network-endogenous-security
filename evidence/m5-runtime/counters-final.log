@@ -1,0 +1,2 @@
+s1 mode1_good=1 mode1_bad=0 mode2_good=1 mode2_bad=0 mode3_good=1 mode3_bad=0 no_majority=0
+s2 mode1_good=3 mode1_bad=0 mode2_good=3 mode2_bad=0 mode3_good=3 mode3_bad=0 no_majority=0
