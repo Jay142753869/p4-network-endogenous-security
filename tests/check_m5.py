@@ -315,7 +315,7 @@ class M5Checks(unittest.TestCase):
                 continue
             used = {p['value'] for q in other['primitives'] for p in q['parameters'] if p['type'] == 'register_array'}
             self.assertFalse(locked & used)
-        text = (ROOT / 'polymorphic.p4').read_text().split('action adjudicate_polymorphic()', 1)[1].split('// M4 landing point', 1)[0]
+        text = (ROOT / 'polymorphic.p4').read_text().split('action adjudicate_polymorphic()', 1)[1].split('    action hold_polymorphic()', 1)[0]
         self.assertIn('@atomic', text)
         self.assertNotIn('hdr.poly.source_crc32', text)
         for name, size in (('good_count', 5), ('bad_count', 5), ('no_majority_count', 1)):

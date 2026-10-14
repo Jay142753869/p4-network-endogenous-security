@@ -28,9 +28,10 @@ sha256 polymorphic.p4 85d13408498ad56cd4a8e585e731db1c0b8cd4ffb2511fe94ce3ea7e27
 sha256 mycontroller.py 8c0dcf65e8f3a457b768cdee45a37cd11e3a49a91bfd2626370db8687dc14ebb
 sha256 tests/check_m3.py 6b9faab98e3fc6f96fe6f4fd034ddb8bb65e1f9a8028f610ffb709a4dc4afc70
 sha256 tests/check_m4.py 4b9b092c5bb30f6538651cb3658a0c78fdd0047c1b92e4f14d4d839079005165
-sha256 tests/check_m5.py cea49525c716ccdf90e68f13672506a1eb550200b0f4fc6196682d2a3c53baab
+sha256 tests/check_m5.py 36b0b53dfa327e0cf32fa4c16cac35ed98dfdb823c2cfb02e4cdf3f8f544efd0
 sha256 class3/state-design.txt ec13016a8da44dcb712d60cbf2f7ce37430c39ff1f39513b0553c8e53869376c
 sha256 build/polymorphic.json f110b5e8eb29ba0fd37e52199f63c1fdbc7da431680f021ce083dbb31bd424fb
 sha256 build/polymorphic.p4.p4info.txtpb 193354ef051412203829a3083a5aa228e4a73d972c33b89864a2c2c1e9d7f086
 
 Final comment-only cleanup: build-10-comment-cleanup.log exit_code=0; Python syntax rechecked exit_code=0.
+M5 source-action boundary check now uses the next action declaration rather than a comment; 15 groups and Python syntax rechecked successfully.

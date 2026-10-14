@@ -16,6 +16,6 @@ test_window_boundary_empty_old_slot_and_half_range (__main__.M5Checks.test_windo
 test_window_reuse_rejects_old_colliding_packet (__main__.M5Checks.test_window_reuse_rejects_old_colliding_packet) ... ok
 
 ----------------------------------------------------------------------
-Ran 15 tests in 3.613s
+Ran 15 tests in 1.341s
 
 OK
