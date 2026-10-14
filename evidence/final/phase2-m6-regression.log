@@ -1,0 +1,21 @@
+OFFLINE ONLY: compiled JSON + Python extern models; temporary SYNTHETIC checker fixtures. NOT native BMv2 M6 execution.
+test_AAB_ABB_outputs_the_majority_content (__main__.M6Checks.test_AAB_ABB_outputs_the_majority_content) ... ok
+test_M1_M5_architecture_and_voting_source_unchanged (__main__.M6Checks.test_M1_M5_architecture_and_voting_source_unchanged) ... ok
+test_all_six_arrival_orders_both_directions_and_all_winning_modes (__main__.M6Checks.test_all_six_arrival_orders_both_directions_and_all_winning_modes) ... ok
+test_archived_native_M5_inputs_restored_by_OFFLINE_interpreter (__main__.M6Checks.test_archived_native_M5_inputs_restored_by_OFFLINE_interpreter) ... ok
+test_duplicate_before_and_after_decision_does_not_output_twice (__main__.M6Checks.test_duplicate_before_and_after_decision_does_not_output_twice) ... ok
+test_inner_fields_udp_checksum_and_binary_payload_preserved (__main__.M6Checks.test_inner_fields_udp_checksum_and_binary_payload_preserved) ... ok
+test_late_third_only_updates_statistics (__main__.M6Checks.test_late_third_only_updates_statistics) ... ok
+test_no_majority_and_repeated_modes_never_output (__main__.M6Checks.test_no_majority_and_repeated_modes_never_output) ... ok
+test_pcap_checker_positive_and_negative_SYNTHETIC_fixtures (__main__.M6Checks.test_pcap_checker_positive_and_negative_SYNTHETIC_fixtures) ... ok
+test_pcap_checker_two_sequences_and_ambiguous_identical_inputs (__main__.M6Checks.test_pcap_checker_two_sequences_and_ambiguous_identical_inputs) ... ok
+test_sr_winner_invalidates_all_nine_stack_elements (__main__.M6Checks.test_sr_winner_invalidates_all_nine_stack_elements) ... ok
+test_two_equal_modes_output_without_the_third (__main__.M6Checks.test_two_equal_modes_output_without_the_third) ... ok
+test_two_sequence_compiled_end_to_end_OFFLINE (__main__.M6Checks.test_two_sequence_compiled_end_to_end_OFFLINE) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.486s
+
+OK
+
+exit_code=0

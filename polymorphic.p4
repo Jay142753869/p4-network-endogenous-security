@@ -584,6 +584,32 @@ control MyIngress(inout headers hdr,
         exit;
     }
 
+    action fault_corrupt(bit<128> xor_mask) {
+        // Keep the original source CRC and every other header field intact.
+        hdr.protected_data.value = hdr.protected_data.value ^ xor_mask;
+    }
+
+    action fault_drop() {
+        mark_to_drop(standard_metadata);
+        exit;
+    }
+
+    table polymorphic_fault {
+        key = {
+            standard_metadata.ingress_port: exact;
+            hdr.poly.direction: exact;
+            hdr.poly.modality_id: exact;
+            hdr.poly.sequence_number: exact;
+        }
+        actions = {
+            fault_corrupt;
+            fault_drop;
+            NoAction;
+        }
+        size = 1024;
+        const default_action = NoAction();
+    }
+
     table polymorphic_destination {
         key = {
             standard_metadata.ingress_port: exact;
@@ -721,6 +747,9 @@ control MyIngress(inout headers hdr,
                 drop();
                 exit;
             }
+            // Only s11/s21/s31 receive exact fault rules. Structural checks
+            // above still run first; the observed CRC is computed downstream.
+            polymorphic_fault.apply();
             if (polymorphic_destination.apply().hit) {
                 if (meta.adjudication_accept == 1) {
                     restore_polymorphic();

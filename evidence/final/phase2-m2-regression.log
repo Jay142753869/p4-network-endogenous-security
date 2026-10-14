@@ -1,0 +1,37 @@
+OFFLINE_PASS IPv4 ICMP remains opaque
+OFFLINE_PASS ordinary UDP non-5000
+OFFLINE_PASS UDP non-5000 with shim-like payload
+OFFLINE_PASS UDP/5000 payload length 0 remains opaque
+OFFLINE_PASS UDP/5000 payload length 4 remains opaque
+OFFLINE_PASS UDP/5000 payload length 15 remains opaque
+OFFLINE_PASS UDP/5000 payload length 17 remains opaque
+OFFLINE_PASS UDP/5000 payload length 32 remains opaque
+OFFLINE_PASS host UDP/5000 protected data
+OFFLINE_PASS IPv4 with options remains opaque
+OFFLINE_PASS IPv4 fragment 8192 remains opaque
+OFFLINE_PASS IPv4 fragment 1 remains opaque
+OFFLINE_PASS IPv4 DF is allowed
+OFFLINE_PASS original IPv4 TCP
+OFFLINE_PASS ordinary IPv6 UDP remains opaque
+OFFLINE_PASS ordinary IPv6 ICMP remains opaque
+OFFLINE_PASS ARP request and destination metadata
+OFFLINE_PASS original SR IPv4 UDP with 1 hops
+OFFLINE_PASS original SR IPv4 UDP with 4 hops
+OFFLINE_PASS original SR IPv4 UDP with 9 hops
+OFFLINE_PASS original SR IPv4 TCP
+OFFLINE_PASS unknown EtherType remains opaque
+OFFLINE_PASS mode 1 direction 0
+OFFLINE_PASS mode 1 direction 1
+OFFLINE_PASS mode 2 direction 0
+OFFLINE_PASS mode 2 direction 1
+OFFLINE_PASS mode 3 direction 0
+OFFLINE_PASS mode 3 direction 1
+OFFLINE_PASS invalid PolyShim magic
+OFFLINE_PASS invalid inner EtherType
+OFFLINE_PASS unsupported inner IPv4 options
+OFFLINE_PASS truncated protected data
+OFFLINE_PASS SR stack overflow
+OFFLINE_PASS truncated PolyShim
+OFFLINE_SUMMARY passed=34; BMv2/Mininet runtime NOT tested
+
+exit_code=0

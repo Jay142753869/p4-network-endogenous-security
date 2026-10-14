@@ -1,0 +1,22 @@
+OFFLINE ONLY: compiled P4 JSON and real protobuf construction; Python extern models and temporary SYNTHETIC pcaps. NOT native BMv2 five-scenario acceptance.
+test_all_five_official_scenarios_both_directions_all_orders_OFFLINE (__main__.FaultChecks.test_all_five_official_scenarios_both_directions_all_orders_OFFLINE) ... ok
+test_controller_reports_rpc_failure_and_closes_connections (__main__.FaultChecks.test_controller_reports_rpc_failure_and_closes_connections) ... ok
+test_drop_exits_before_forwarding_and_does_not_count (__main__.FaultChecks.test_drop_exits_before_forwarding_and_does_not_count) ... ok
+test_final_pcap_checker_all_scenarios_both_directions_SYNTHETIC (__main__.FaultChecks.test_final_pcap_checker_all_scenarios_both_directions_SYNTHETIC) ... ok
+test_final_pcap_checker_rejects_no_fault_double_xor_crc_coverup_and_duplicates (__main__.FaultChecks.test_final_pcap_checker_rejects_no_fault_double_xor_crc_coverup_and_duplicates) ... ok
+test_full_128bit_xor_changes_only_actual_protected_data (__main__.FaultChecks.test_full_128bit_xor_changes_only_actual_protected_data) ... ok
+test_invalid_arguments_and_conflicts_fail_before_network (__main__.FaultChecks.test_invalid_arguments_and_conflicts_fail_before_network) ... ok
+test_mode_full_sequence_direction_and_port_exact_matching (__main__.FaultChecks.test_mode_full_sequence_direction_and_port_exact_matching) ... ok
+test_only_target_sequence_faulted_across_continuous_sends (__main__.FaultChecks.test_only_target_sequence_faulted_across_continuous_sends) ... ok
+test_ordinary_protocols_and_invalid_poly_never_reach_fault_table (__main__.FaultChecks.test_ordinary_protocols_and_invalid_poly_never_reach_fault_table) ... ok
+test_p4info_and_fault_action_write_scope (__main__.FaultChecks.test_p4info_and_fault_action_write_scope) ... ok
+test_parse_unsigned_fields_and_boundaries (__main__.FaultChecks.test_parse_unsigned_fields_and_boundaries) ... ok
+test_real_p4runtime_rule_construction_and_original_entries_preserved (__main__.FaultChecks.test_real_p4runtime_rule_construction_and_original_entries_preserved) ... ok
+test_repeated_faults_are_idempotent_and_conflicts_rejected (__main__.FaultChecks.test_repeated_faults_are_idempotent_and_conflicts_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 2.706s
+
+OK
+
+exit_code=0

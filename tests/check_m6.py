@@ -194,9 +194,20 @@ class M6Checks(unittest.TestCase):
             ['git', '--git-dir=.course-git', '--work-tree=.', 'show', '235c188:mycontroller.py'],
             cwd=ROOT, text=True))
         new_controller = ast.parse((ROOT / 'mycontroller.py').read_text())
-        old_controller.body.pop(0)  # module docstring only
-        new_controller.body.pop(0)
-        self.assertEqual(ast.dump(old_controller), ast.dump(new_controller))
+        old_functions = {f.name: f for f in old_controller.body if isinstance(f, ast.FunctionDef)}
+        new_functions = {f.name: f for f in new_controller.body if isinstance(f, ast.FunctionDef)}
+        for name, function in old_functions.items():
+            if name != 'main':
+                self.assertEqual(ast.dump(function), ast.dump(new_functions[name]), name)
+        # Final-stage fault setup is allowed; every pre-existing statement in
+        # the pipeline/route/role/PRE/source setup must still be identical.
+        old_setup = next(n for n in old_functions['main'].body if isinstance(n, ast.Try)).body
+        new_setup = next(n for n in new_functions['main'].body if isinstance(n, ast.Try)).body
+        fault_calls = [n for n in new_setup if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
+                       and isinstance(n.value.func, ast.Name) and n.value.func.id == 'writeFaultRules']
+        self.assertEqual(len(fault_calls), 1)
+        new_setup = [n for n in new_setup if n not in fault_calls]
+        self.assertEqual([ast.dump(n) for n in old_setup], [ast.dump(n) for n in new_setup])
 
     def network(self, direction, messages=(b'first', b'second'), order=(3, 1, 2)):
         """Execute compiled source/PRE model/paths/destination, collecting SYNTHETIC frames."""

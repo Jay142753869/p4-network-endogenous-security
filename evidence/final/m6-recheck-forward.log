@@ -1,0 +1,5 @@
+M6_PCAP_OK direction=0 inputs=1 modalities=3 host_outputs=1 per_sequence=1
+sequence=1 source_crc32=0x93d25cf1 protected_hex=6d362d666f7277617264000000000000 host_outputs=1
+Verified supplied capture contents; capture provenance must be recorded separately.
+
+exit_code=0

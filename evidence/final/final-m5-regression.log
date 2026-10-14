@@ -1,0 +1,23 @@
+OFFLINE ONLY: compiled JSON instructions; Python CRC/register/counter models. NOT BMv2 M5 execution.
+test_AAA_AAB_ABB_ABC_and_missing_mode (__main__.M5Checks.test_AAA_AAB_ABB_ABC_and_missing_mode) ... ok
+test_all_arrival_orders_and_mode1_corruption (__main__.M5Checks.test_all_arrival_orders_and_mode1_corruption) ... ok
+test_archived_real_M4_arrivals_replayed_OFFLINE (__main__.M5Checks.test_archived_real_M4_arrivals_replayed_OFFLINE) ... ok
+test_compiled_atomic_action_and_interfaces (__main__.M5Checks.test_compiled_atomic_action_and_interfaces) ... ok
+test_continuous_stream_exceeds_window (__main__.M5Checks.test_continuous_stream_exceeds_window) ... ok
+test_direction_isolation_and_role_matching (__main__.M5Checks.test_direction_isolation_and_role_matching) ... ok
+test_duplicate_cannot_vote_or_pollute_state (__main__.M5Checks.test_duplicate_cannot_vote_or_pollute_state) ... ok
+test_interleaved_sequences (__main__.M5Checks.test_interleaved_sequences) ... ok
+test_late_third_and_no_majority_exactly_once (__main__.M5Checks.test_late_third_and_no_majority_exactly_once) ... ok
+test_observed_crc_order_source_independence_and_tampering (__main__.M5Checks.test_observed_crc_order_source_independence_and_tampering) ... ok
+test_official_counter_read_and_feedback_without_socket (__main__.M5Checks.test_official_counter_read_and_feedback_without_socket) ... ok
+test_ordinary_protocols_leave_vote_state_unchanged (__main__.M5Checks.test_ordinary_protocols_leave_vote_state_unchanged) ... ok
+test_sequence_wrap_zero_and_wrapped_collision (__main__.M5Checks.test_sequence_wrap_zero_and_wrapped_collision) ... ok
+test_window_boundary_empty_old_slot_and_half_range (__main__.M5Checks.test_window_boundary_empty_old_slot_and_half_range) ... ok
+test_window_reuse_rejects_old_colliding_packet (__main__.M5Checks.test_window_reuse_rejects_old_colliding_packet) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 1.198s
+
+OK
+
+exit_code=0

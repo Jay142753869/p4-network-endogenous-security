@@ -1,0 +1,80 @@
+UNCHANGED MyIngress.polymorphic_schedule
+
+UNCHANGED MyIngress.polymorphic_destination
+
+UNCHANGED MyIngress.ipv4_lpm
+
+UNCHANGED MyIngress.ipv6_lpm
+
+UNCHANGED MyIngress.arp_match
+
+UNCHANGED MyIngress.start_polymorphic
+
+UNCHANGED MyIngress.adjudicate_polymorphic
+
+UNCHANGED MyIngress.good_count
+
+UNCHANGED MyIngress.bad_count
+
+UNCHANGED MyIngress.no_majority_count
+
+preamble {
+  id: 39334879
+  name: "MyIngress.polymorphic_fault"
+  alias: "polymorphic_fault"
+}
+match_fields {
+  id: 1
+  name: "standard_metadata.ingress_port"
+  bitwidth: 9
+  match_type: EXACT
+}
+match_fields {
+  id: 2
+  name: "hdr.poly.direction"
+  bitwidth: 8
+  match_type: EXACT
+}
+match_fields {
+  id: 3
+  name: "hdr.poly.modality_id"
+  bitwidth: 8
+  match_type: EXACT
+}
+match_fields {
+  id: 4
+  name: "hdr.poly.sequence_number"
+  bitwidth: 32
+  match_type: EXACT
+}
+action_refs {
+  id: 25288647
+}
+action_refs {
+  id: 29997976
+}
+action_refs {
+  id: 21257015
+}
+const_default_action_id: 21257015
+initial_default_action {
+  action_id: 21257015
+}
+size: 1024
+
+preamble {
+  id: 25288647
+  name: "MyIngress.fault_corrupt"
+  alias: "fault_corrupt"
+}
+params {
+  id: 1
+  name: "xor_mask"
+  bitwidth: 128
+}
+
+preamble {
+  id: 29997976
+  name: "MyIngress.fault_drop"
+  alias: "fault_drop"
+}

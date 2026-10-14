@@ -58,7 +58,7 @@ class OfflineIngress(OfflineParser):
     def evaluate(self, node):
         if node['type'] == 'field' and node['value'][1] == '$valid$':
             return int(node['value'][0] in self.valid)
-        if node['type'] == 'runtime_data':
+        if node['type'] in ('runtime_data', 'local'):
             return self.runtime_data[node['value']]
         if node['type'] == 'expression':
             expr = node['value']
@@ -71,7 +71,7 @@ class OfflineIngress(OfflineParser):
             operations = {'or': lambda a, b: int(bool(a) or bool(b)),
                           '!=': operator.ne, '>': operator.gt, '<': operator.lt,
                           '>=': operator.ge, '+': operator.add, '-': operator.sub,
-                          '|': operator.or_, '<<': operator.lshift}
+                          '|': operator.or_, '^': operator.xor, '<<': operator.lshift}
             if op in operations:
                 return int(operations[op](self.evaluate(expr['left']), right))
         return super().evaluate(node)

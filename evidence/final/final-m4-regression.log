@@ -1,0 +1,16 @@
+OFFLINE ONLY: JSON interpretation, Python checksum model and synthetic hop traces.
+test_destination_configuration_and_m3_source_preservation (__main__.M4Checks.test_destination_configuration_and_m3_source_preservation) ... ok
+test_invalid_exit_instance_direction_and_incomplete_headers (__main__.M4Checks.test_invalid_exit_instance_direction_and_incomplete_headers) ... ok
+test_missing_destination_rules_fail_closed (__main__.M4Checks.test_missing_destination_rules_fail_closed) ... ok
+test_ordinary_arp_reply (__main__.M4Checks.test_ordinary_arp_reply) ... ok
+test_ordinary_forwarding_and_sr_distinction (__main__.M4Checks.test_ordinary_forwarding_and_sr_distinction) ... ok
+test_pcap_checker_with_synthetic_full_path_fixtures (__main__.M4Checks.test_pcap_checker_with_synthetic_full_path_fixtures) ... ok
+test_six_encapsulations_validity_lengths_and_immutable_inner (__main__.M4Checks.test_six_encapsulations_validity_lengths_and_immutable_inner) ... ok
+test_six_multi_hop_paths_and_gateway_interception (__main__.M4Checks.test_six_multi_hop_paths_and_gateway_interception) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.066s
+
+OK
+
+exit_code=0

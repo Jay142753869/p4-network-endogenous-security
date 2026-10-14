@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Ordinary forwarding, M3 scheduling and M5 destination adjudication rules.
+"""Ordinary forwarding, scheduling, adjudication and exact intermediate faults.
 
 M6 restores only the deciding copy in P4; destination rules stay unchanged.
 """
 
 import argparse
+from dataclasses import dataclass
 import grpc
 import os
+import re
 import sys
 from time import sleep
 
@@ -22,6 +24,82 @@ import p4runtime_lib.helper
 
 POLY_MCAST_GROUP = 10
 POLY_REPLICAS = ((2, 1), (3, 2), (4, 3))
+FAULT_SWITCHES = {1: 's11', 2: 's21', 3: 's31'}
+
+
+@dataclass(frozen=True)
+class Fault:
+    operation: str
+    mode: int
+    sequence: int
+    mask: int = 0
+
+    def __post_init__(self):
+        if self.operation not in ('corrupt', 'drop'):
+            raise ValueError('fault operation must be corrupt or drop')
+        for name, value, maximum in (('MODE', self.mode, 3),
+                                      ('SEQ', self.sequence, 0xffffffff),
+                                      ('MASK', self.mask, (1 << 128) - 1)):
+            if type(value) is not int or not 0 <= value <= maximum:
+                raise ValueError('%s is outside its unsigned field range' % name)
+        if self.mode == 0:
+            raise ValueError('MODE must be 1, 2 or 3')
+        if self.operation == 'drop' and self.mask:
+            raise ValueError('drop has no MASK')
+
+
+def parse_fault(value):
+    """Argparse type: strict unsigned decimal/hex, full 32-bit seq/128-bit mask."""
+    parts = value.split(':')
+    if not (len(parts) == 4 and parts[0] == 'corrupt' or
+            len(parts) == 3 and parts[0] == 'drop'):
+        raise argparse.ArgumentTypeError('expected corrupt:MODE:SEQ:MASK or drop:MODE:SEQ')
+    try:
+        numbers = []
+        for part in parts[1:]:
+            if not re.fullmatch(r'(?:0[xX][0-9a-fA-F]+|[0-9]+)', part):
+                raise ValueError('fault numbers must be unsigned decimal or 0x hexadecimal')
+            numbers.append(int(part, 16 if part.lower().startswith('0x') else 10))
+        return Fault(parts[0], *numbers)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def normalize_faults(faults):
+    """Identical repeats are idempotent; reject conflicting same-mode/seq rules."""
+    unique = {}
+    for value in faults:
+        fault = parse_fault(value) if isinstance(value, str) else value
+        if not isinstance(fault, Fault):
+            raise ValueError('fault entries must be Fault values or fault strings')
+        key = (fault.mode, fault.sequence)
+        if key in unique and unique[key] != fault:
+            raise ValueError('conflicting faults for MODE=%d SEQ=%d' % key)
+        unique[key] = fault
+    return tuple(unique.values())
+
+
+def writeFaultRule(p4info_helper, switch, fault, direction):
+    if direction not in (0, 1) or switch.name != FAULT_SWITCHES[fault.mode]:
+        raise ValueError('fault switch/direction does not match the physical path')
+    entry = p4info_helper.buildTableEntry(
+        table_name='MyIngress.polymorphic_fault',
+        match_fields={
+            'standard_metadata.ingress_port': 1 if direction == 0 else 2,
+            'hdr.poly.direction': direction,
+            'hdr.poly.modality_id': fault.mode,
+            'hdr.poly.sequence_number': fault.sequence,
+        },
+        action_name='MyIngress.fault_' + fault.operation,
+        action_params={'xor_mask': fault.mask} if fault.operation == 'corrupt' else {},
+    )
+    switch.WriteTableEntry(entry)
+
+
+def writeFaultRules(p4info_helper, switches, faults):
+    for fault in normalize_faults(faults):
+        for direction in (0, 1):
+            writeFaultRule(p4info_helper, switches[fault.mode], fault, direction)
 
 
 def writeMulticastGroup(p4info_helper, switch, group_id=POLY_MCAST_GROUP,
@@ -107,7 +185,9 @@ def writeIpv6_lpmRules(p4info_helper, sw, match_fields, action_params):
     sw.WriteTableEntry(table_entry)
 
 
-def main(p4info_file_path, bmv2_file_path):
+def main(p4info_file_path, bmv2_file_path, faults=()):
+    # Validate everything before opening channels or changing any pipeline.
+    faults = normalize_faults(faults)
     # Instantiate a P4Runtime helper from the p4info file
     p4info_helper = p4runtime_lib.helper.P4InfoHelper(p4info_file_path)
 
@@ -236,6 +316,9 @@ def main(p4info_file_path, bmv2_file_path):
             writePolymorphicDestinationRule(p4info_helper, s2, 0, ingress_port, modality_id)
             writePolymorphicDestinationRule(p4info_helper, s1, 1, ingress_port, modality_id)
 
+        # Faults are installed only on one node per modality, before sources.
+        writeFaultRules(p4info_helper, {1: s11, 2: s21, 3: s31}, faults)
+
         # Install PRE before enabling either source schedule. Intermediate
         # switches retain only their original ordinary forwarding entries.
         writeMulticastGroup(p4info_helper, s1)
@@ -243,16 +326,15 @@ def main(p4info_file_path, bmv2_file_path):
         writePolymorphicScheduleRule(p4info_helper, s1, "10.0.2.2", 0)
         writePolymorphicScheduleRule(p4info_helper, s2, "10.0.1.1", 1)
 
-        # TODO M6: restore only the current copy that first forms a majority.
-        # Fault injection is deliberately left to a later stage.
-        
-
     except KeyboardInterrupt:
         print(" Shutting down.")
+        return 130
     except grpc.RpcError as e:
         printGrpcError(e)
-
-    ShutdownAllSwitchConnections()
+        return 1
+    finally:
+        ShutdownAllSwitchConnections()
+    return 0
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='P4Runtime Controller')
@@ -262,7 +344,13 @@ if __name__ == '__main__':
     parser.add_argument('--bmv2-json', help='BMv2 JSON file from p4c',
                         type=str, action="store", required=False,
                         default='./build/polymorphic.json')
+    parser.add_argument('--fault', type=parse_fault, action='append', default=[],
+                        metavar='RULE', help='repeatable corrupt:MODE:SEQ:MASK or drop:MODE:SEQ; applies to both directions')
     args = parser.parse_args()
+    try:
+        args.fault = normalize_faults(args.fault)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if not os.path.exists(args.p4info):
         parser.print_help()
@@ -272,4 +360,4 @@ if __name__ == '__main__':
         parser.print_help()
         print("\nBMv2 JSON file not found: %s\nHave you run 'make'?" % args.bmv2_json)
         parser.exit(1)
-    main(args.p4info, args.bmv2_json)
+    sys.exit(main(args.p4info, args.bmv2_json, args.fault))

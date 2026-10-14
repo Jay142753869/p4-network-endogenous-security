@@ -108,4 +108,18 @@ M5原子action、seen/decided、序号、CRC和counter逻辑保持不变。
 tests/check_m5.py解释编译JSON并模拟CRC/register/counter；含错误数据、重复、顺序、窗口和回绕。
 实际M4目的入口pcap离线重放也只是JSON解释器测试，不是M5真实BMv2验证。
 用户后续提供的真实M5无故障材料归档于evidence/m5-runtime；不能据此声称M6运行通过。
-M6真实状态以DEVELOPMENT_M6.md记录为准；普通IPv6反向及SR双向真实回归仍待补充。
+用户后续提供的M6正反向真实出口pcap已归档evidence/m6-runtime，原检查器实际复查通过。
+用户报告普通IPv4/IPv6双向真实通过；普通SR双向仍缺明确真实回归记录。
+本轮故障五场景原生状态以DEVELOPMENT_FINAL.md记录为准，不能由离线结果推断通过。
+
+11. 最终阶段故障注入（不改裁决/还原）
+仅在完整合法PolyShim分支调用polymorphic_fault，再进入目的角色表。
+表exact key=ingress_port、direction、modality_id、完整32位sequence_number。
+控制器仅向s11/s21/s31分别安装mode1/2/3规则；方向0匹配入口1，方向1匹配入口2。
+两方向的既有无环路径均只经过该模态的一台注入节点一次；其他交换机不装故障规则。
+corrupt只对实际128位protected_data做MASK XOR；不改source_crc32、UDP或其他inner字段。
+drop直接mark_to_drop+exit，不到达目的状态机，因此缺失模态不增加bad。
+未指定故障时表默认NoAction；普通IPv4/IPv6/ARP/SR及非法PolyShim不进入故障表。
+相同--fault重复指定会去重；同一mode/sequence的不同操作或MASK冲突在连交换机前拒绝。
+规则对两个方向均生效，各自匹配正确入口；不增加回环或重注入的全网一次性标记。
+每场景使用新Mininet及P4Runtime流水线，清空规则、sequence及裁决窗口后再发送。

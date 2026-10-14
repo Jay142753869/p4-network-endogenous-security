@@ -1,0 +1,71 @@
+$ python3 -m py_compile mycontroller.py tests/check_m3.py tests/check_m6.py tests/check_faults.py tests/check_final_pcaps.py send-poly.py receive-poly.py read-counters.py evaluate-counters.py run-poly-tests.py
+exit_code=0
+
+$ git --git-dir=.course-git --work-tree=. diff --check
+exit_code=0
+
+$ git --git-dir=.course-git --work-tree=. diff --exit-code 888db03 -- utils topo reference materials STUDENT_TODO.md run-poly-tests.py send-poly.py receive-poly.py read-counters.py evaluate-counters.py tests/check_m2_parser.py tests/check_m4.py tests/check_m5.py tests/check_m4_pcaps.py tests/check_m6_pcaps.py
+exit_code=0
+
+$ p4c-bm2-ss --version
+p4c-bm2-ss
+Version 1.2.5.15 (SHA: cdd7205767 BUILD: Release)
+exit_code=0
+
+$ simple_switch --version
+1.15.4-883d4eae
+exit_code=0
+
+$ mn --version
+2.3.1b4
+exit_code=0
+
+UNCHANGED compiled action: MyIngress.adjudicate_polymorphic (139 primitives)
+
+UNCHANGED compiled action: MyIngress.prepare_polymorphic (21 primitives)
+
+UNCHANGED compiled action: MyIngress.start_polymorphic (2 primitives)
+
+UNCHANGED compiled action: MyIngress.restore_polymorphic (27 primitives)
+
+UNCHANGED compiled action: MyIngress.srcRoute_nhop (2 primitives)
+
+UNCHANGED compiled action: MyIngress.srcRoute_finish (1 primitives)
+
+UNCHANGED compiled action: MyIngress.ipv4_forward (4 primitives)
+
+UNCHANGED compiled action: MyIngress.ipv6_forward (4 primitives)
+
+UNCHANGED compiled action: MyIngress.send_arp_reply (8 primitives)
+
+UNCHANGED compiled register_arrays
+
+UNCHANGED compiled counter_arrays
+
+UNCHANGED compiled parsers
+
+UNCHANGED compiled deparsers
+
+UNCHANGED compiled checksums
+
+UNCHANGED compiled calculations
+
+sha256 polymorphic.p4 9265251f17916fe454a3b500b19d6f151a68cec18a281e27327c17cab0eb72c0
+
+sha256 mycontroller.py 6a5fe6c084dbe050937595c855702ae4f55be89db4fc0a70c1838a4f4c84d408
+
+sha256 class3/state-design.txt 46f5ea3800fab289bccd84698cca56cba0eb55451decd9e8f1a25092a1353133
+
+sha256 tests/check_m3.py adc4c133d70ffae66f0212f22bcf1e3757bb059bd188cc0a0eaae78684b0600f
+
+sha256 tests/check_m6.py 0d9cbbf0d904121b9bf1312fef3250cad841f823cf3df2ebae151833d43dd17f
+
+sha256 tests/check_faults.py 5321f1a40a4d8f833e313d753afbf41ea9749b4502fbecb1a5bd10d6546f1d62
+
+sha256 tests/check_final_pcaps.py 8cb94a76aea1c3063b5d330fae20df33fd33495d8c2e6803b937db3f1febba52
+
+sha256 run-poly-tests.py e1d7fbd354929179264a8854ef222177487afab422ab883d5a723aabbbea3f59
+
+sha256 build/polymorphic.json 3e77dfdf646af0076a1a032e3d4ba2380266041220ecef7b9c9f4b963bfa0d41
+
+sha256 build/polymorphic.p4.p4info.txtpb 504e638be856335c4de7b8ead1b2d887e337da5b21922c78c12c6cd365b5e362

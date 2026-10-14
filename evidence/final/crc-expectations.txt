@@ -1,0 +1,6 @@
+OFFLINE mathematical CRC expectations, not native scenario results.
+232-bit input = 29 bytes; masks act on the last 16 bytes in network byte order.
+C0 is the actual source CRC of each fresh input; random UDP sport changes C0.
+MASK=0x1: observed_crc = C0 XOR 0x77073096
+MASK=0x2: observed_crc = C0 XOR 0xee0e612c
+MASK=0x4: observed_crc = C0 XOR 0x076dc419
