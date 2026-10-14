@@ -9,6 +9,10 @@ const bit<16> TYPE_ARP           = 0x0806;
 
 const bit<16> TYPE_IPV6          = 0x86DD;
 
+const bit<16> POLY_MAGIC        = 0x504f; // ASCII "PO"
+const bit<8>  POLY_IP_PROTOCOL  = 253;
+const bit<16> POLY_UDP_PORT     = 5000;
+
 const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
 const bit<16> ARP_PTYPE_IPV4     = 0x0800;
 const bit<8>  ARP_HLEN_ETHERNET  = 6;
@@ -116,6 +120,20 @@ header udp_t {
     bit<16> checksum;
 }
 
+// M1: 14-byte shim shared by all three outer modalities.
+header polyShim_t {
+    bit<16> magic;
+    bit<8>  direction;       // 0: h1 -> h2, 1: h2 -> h1
+    bit<32> sequence_number;
+    bit<8>  modality_id;
+    bit<32> source_crc32;
+    bit<16> inner_ether_type; // TYPE_IPV4 for this experiment
+}
+
+header protected_data_t {
+    bit<128> value;          // exactly 16 bytes, in wire order
+}
+
 struct metadata {
     ip4Addr_t   dst_ipv4; // dst ip
 
@@ -128,8 +146,11 @@ struct headers {
     arp_t       arp;
     ipv4_t      ipv4;
     ipv6_t      ipv6;
+    polyShim_t  poly;
+    ipv4_t      inner_ipv4;  // independent of the ordinary/outer hdr.ipv4
     tcp_t       tcp;
     udp_t       udp;
+    protected_data_t protected_data;
 }
 
 /*************************************************************************
@@ -376,15 +397,20 @@ control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
 
 control MyDeparser(packet_out packet, in headers hdr) {
     apply {
-        // TODO M1/M4/M6: emit newly introduced outer/PolyShim/inner headers in
-        // wire order. Header validity decides which modality is serialized.
+        // M1: invalid headers emit no bytes. hdr.ipv4 is ordinary IPv4 or
+        // outer IPv4; only hdr.inner_ipv4 stores the encapsulated original.
+        // TODO M4/M6: set/invalidate the appropriate instances on encapsulation
+        // and restoration, keeping this wire order.
         packet.emit(hdr.ethernet);
         packet.emit(hdr.srcRoutes);
         packet.emit(hdr.arp);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.ipv6);
+        packet.emit(hdr.poly);
+        packet.emit(hdr.inner_ipv4);
         packet.emit(hdr.tcp);
         packet.emit(hdr.udp);
+        packet.emit(hdr.protected_data);
     }
 }
 
