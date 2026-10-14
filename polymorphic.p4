@@ -12,6 +12,7 @@ const bit<16> TYPE_IPV6          = 0x86DD;
 const bit<16> POLY_MAGIC        = 0x504f; // ASCII "PO"
 const bit<8>  POLY_IP_PROTOCOL  = 253;
 const bit<16> POLY_UDP_PORT     = 5000;
+const bit<16> POLY_MCAST_GROUP  = 10;
 
 const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
 const bit<16> ARP_PTYPE_IPV4     = 0x0800;
@@ -142,7 +143,10 @@ header protected_data_t {
 struct metadata {
     ip4Addr_t   dst_ipv4; // dst ip
 
-    // TODO M3-M6: add packet role, sequence, modality, CRC and restore metadata.
+    bit<1>      scheduled;
+    bit<8>      packet_direction;
+    bit<32>     sequence_number;
+    // TODO M5-M6: add destination state and restore metadata.
 }
 
 struct headers {
@@ -292,8 +296,64 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
+    // BMv2 initializes both slots to zero. Slots are direction 0 / 1, and
+    // each switch owns its own array. Store the last allocated sequence.
+    register<bit<32>>(2) sequence_register;
+
     action drop() {
         mark_to_drop(standard_metadata);
+    }
+
+    action start_polymorphic(bit<8> packet_direction) {
+        meta.scheduled = 1;
+        meta.packet_direction = packet_direction;
+    }
+
+    table polymorphic_schedule {
+        key = {
+            standard_metadata.ingress_port: exact;
+            hdr.ipv4.dstAddr: exact;
+            hdr.udp.dstPort: exact;
+        }
+        actions = {
+            start_polymorphic;
+            NoAction;
+        }
+        size = 16;
+        const default_action = NoAction();
+    }
+
+    action prepare_polymorphic() {
+        // Save before ordinary routing changes TTL/MAC. The outer IPv4 will
+        // only be built by M4; never emit the same original IPv4 twice.
+        hdr.inner_ipv4 = hdr.ipv4;
+        hdr.ipv4.setInvalid();
+        @atomic {
+            sequence_register.read(meta.sequence_number,
+                                   (bit<32>)meta.packet_direction);
+            // bit<32> addition: first is 1; 0xffffffff wraps to 0.
+            meta.sequence_number = meta.sequence_number + 1;
+            sequence_register.write((bit<32>)meta.packet_direction,
+                                    meta.sequence_number);
+        }
+        hdr.poly.setValid();
+        hdr.poly.magic = POLY_MAGIC;
+        hdr.poly.direction = meta.packet_direction;
+        hdr.poly.sequence_number = meta.sequence_number;
+        hdr.poly.modality_id = 0; // pending M4, not an on-wire modality
+        // CRC-32/ISO-HDLC, 232 bits in this exact order, no payload/padding.
+        // max=2^32 (64-bit argument) preserves all 32 CRC bits, including
+        // 0xffffffff; max=0xffffffff would incorrectly reduce that result.
+        hash(hdr.poly.source_crc32, HashAlgorithm.crc32, (bit<32>)0,
+             { hdr.inner_ipv4.srcAddr,
+               hdr.inner_ipv4.dstAddr,
+               hdr.inner_ipv4.protocol,
+               hdr.udp.srcPort,
+               hdr.udp.dstPort,
+               hdr.protected_data.value },
+             (bit<64>)0x100000000);
+        hdr.poly.inner_ether_type = TYPE_IPV4;
+        standard_metadata.mcast_grp = POLY_MCAST_GROUP;
     }
     
     action srcRoute_nhop() {
@@ -376,12 +436,74 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
-        /*
-         * TODO M3: check destination-gateway traffic before ordinary routing.
-         * TODO M3: check source-gateway schedule before ipv4_lpm.
-         * TODO M5: destination processing must either emit exactly one restored
-         * packet or drop; outer packets must never reach a host unchanged.
-         */
+        // Parser rejection on v1model does not automatically drop a packet.
+        if (standard_metadata.parser_error != error.NoError) {
+            drop();
+            exit;
+        }
+        meta.scheduled = 0;
+        meta.packet_direction = 0;
+        standard_metadata.mcast_grp = 0;
+
+        if (hdr.poly.isValid()) {
+            // Only complete, structurally consistent experiment copies may
+            // continue to ordinary intermediate routing. Never schedule them.
+            if (hdr.poly.magic != POLY_MAGIC ||
+                hdr.poly.inner_ether_type != TYPE_IPV4 ||
+                hdr.poly.direction > 1 ||
+                hdr.poly.modality_id < 1 || hdr.poly.modality_id > 3 ||
+                !hdr.inner_ipv4.isValid() || !hdr.udp.isValid() ||
+                !hdr.protected_data.isValid() ||
+                hdr.inner_ipv4.version != 4 || hdr.inner_ipv4.ihl != 5 ||
+                (hdr.inner_ipv4.flags & 3w5) != 0 ||
+                hdr.inner_ipv4.fragOffset != 0 ||
+                hdr.inner_ipv4.protocol != 17 || hdr.inner_ipv4.totalLen != 44 ||
+                hdr.udp.dstPort != POLY_UDP_PORT || hdr.udp.pkt_length != 24) {
+                drop();
+                exit;
+            }
+            if (!((hdr.poly.modality_id == 1 &&
+                   hdr.ethernet.etherType == TYPE_IPV4 && hdr.ipv4.isValid() &&
+                   hdr.ipv4.protocol == POLY_IP_PROTOCOL &&
+                   !hdr.srcRoutes[0].isValid()) ||
+                  (hdr.poly.modality_id == 2 &&
+                   hdr.ethernet.etherType == TYPE_IPV6 && hdr.ipv6.isValid() &&
+                   hdr.ipv6.version == 6 && hdr.ipv6.nextHdr == POLY_IP_PROTOCOL) ||
+                  (hdr.poly.modality_id == 3 &&
+                   hdr.ethernet.etherType == TYPE_SRCROUTING &&
+                   hdr.srcRoutes[0].isValid() && !hdr.ipv4.isValid()))) {
+                drop();
+                exit;
+            }
+        }
+
+        // M3: fixed Ethernet/IPv4/UDP input only, before ordinary routing can
+        // decrement TTL or overwrite MAC addresses. Padding may follow it.
+        if (standard_metadata.ingress_port == 1 &&
+            hdr.ethernet.isValid() && hdr.ethernet.etherType == TYPE_IPV4 &&
+            hdr.ipv4.isValid() && hdr.udp.isValid() &&
+            hdr.protected_data.isValid() && !hdr.poly.isValid() &&
+            !hdr.inner_ipv4.isValid() && !hdr.ipv6.isValid() &&
+            !hdr.srcRoutes[0].isValid() &&
+            hdr.ipv4.version == 4 && hdr.ipv4.ihl == 5 &&
+            (hdr.ipv4.flags & 3w5) == 0 && hdr.ipv4.fragOffset == 0 &&
+            hdr.ipv4.protocol == 17 && hdr.ipv4.totalLen == 44 &&
+            hdr.udp.dstPort == POLY_UDP_PORT && hdr.udp.pkt_length == 24 &&
+            standard_metadata.packet_length >= 58) {
+            polymorphic_schedule.apply();
+        }
+        if (meta.scheduled == 1) {
+            // Reject a misconfigured action parameter before register access.
+            if (meta.packet_direction > 1) {
+                drop();
+                exit;
+            }
+            prepare_polymorphic();
+            exit;
+        }
+
+        // TODO M5: destination-gateway processing must precede ordinary SR
+        // termination / routing and emit at most one restored packet.
         if (hdr.srcRoutes[0].isValid()){
             if (hdr.srcRoutes[0].bos == 1){
                 srcRoute_finish();
@@ -392,13 +514,13 @@ control MyIngress(inout headers hdr,
             }
         }
         
-        else if(hdr.ethernet.etherType == TYPE_IPV4) {
+        else if(hdr.ethernet.etherType == TYPE_IPV4 && hdr.ipv4.isValid()) {
             ipv4_lpm.apply();
         }
-        else if(hdr.ethernet.etherType == TYPE_ARP) {
+        else if(hdr.ethernet.etherType == TYPE_ARP && hdr.arp.isValid()) {
             arp_match.apply();
         }
-        else if(hdr.ethernet.etherType == TYPE_IPV6){
+        else if(hdr.ethernet.etherType == TYPE_IPV6 && hdr.ipv6.isValid()){
 	    ipv6_lpm.apply();
 	}
     }

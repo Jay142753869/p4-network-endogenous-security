@@ -1,0 +1,32 @@
+$ p4c-bm2-ss --version
+p4c-bm2-ss
+Version 1.2.5.15 (SHA: cdd7205767 BUILD: Release)
+exit_code=0
+$ simple_switch --version
+1.15.4-883d4eae
+exit_code=0
+$ mn --version
+2.3.1b4
+exit_code=0
+$ python3 -m py_compile mycontroller.py tests/check_m3.py tests/check_m3_pcaps.py
+
+exit_code=0
+$ git --git-dir=.course-git --work-tree=. diff --check
+
+exit_code=0
+$ git --git-dir=.course-git --work-tree=. diff --exit-code 154e6d9 -- utils topo reference materials STUDENT_TODO.md run-poly-tests.py read-counters.py evaluate-counters.py send-poly.py receive-poly.py tests/check_m2_parser.py
+
+exit_code=0
+UNCHANGED region: parser MyParser(
+UNCHANGED region: action srcRoute_nhop()
+UNCHANGED region: control MyEgress(
+UNCHANGED region: control MyComputeChecksum(
+UNCHANGED region: control MyDeparser(
+UNCHANGED controller ordinary ARP/IPv4/IPv6 calls: 18
+P4INFO: schedule/action names, exact keys and direction width checked
+sha256 polymorphic.p4 4bca2876910efe9222d7bf47f51645266c15956d18da08964b30556458c675e4
+sha256 mycontroller.py 30eac4493a868abbc4c93612b7d28e1c4bcd45d8b22013127eaf7a05a36c2958
+sha256 tests/check_m3.py 37045cff3d4680496ee9dc8347b707b0c239cdc7f8245f68f3512d446ffb3229
+sha256 tests/check_m3_pcaps.py 97f8bda93e575ddd58283fa1d9518e5633ccd42224d0ab42a44bfaee23019b92
+sha256 build/polymorphic.json e652586ed40fe260a1ed8300ccf80e15f4c7179bd042f24779de09e623d2f9a9
+sha256 build/polymorphic.p4.p4info.txtpb a3d24a6e5e162149ca2d5827f2126bf7cb9037c64c7b7cdba6f1f47d2bbe5284

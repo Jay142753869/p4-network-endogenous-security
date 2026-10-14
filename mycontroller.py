@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Verified three-path baseline controller used as the student starter.
+"""Ordinary forwarding plus M3 source scheduling and P4Runtime multicast.
 
-The baseline installs ordinary IPv4 and IPv6 forwarding only. Follow the
-milestones in STUDENT_TODO.md to add multicast scheduling, gateway roles,
-fault injection and counter reads. Keep this file runnable after every step.
+M4 encapsulation and M5/M6 destination processing are still unimplemented.
 """
 
 import argparse
@@ -21,6 +19,38 @@ import p4runtime_lib.bmv2
 from p4runtime_lib.error_utils import printGrpcError
 from p4runtime_lib.switch import ShutdownAllSwitchConnections
 import p4runtime_lib.helper
+
+POLY_MCAST_GROUP = 10
+POLY_REPLICAS = ((2, 1), (3, 2), (4, 3))
+
+
+def writeMulticastGroup(p4info_helper, switch, group_id=POLY_MCAST_GROUP,
+                        replicas=POLY_REPLICAS):
+    """Write PRE replicas as (egress_port, instance), not the reverse."""
+    entry = p4info_helper.buildMulticastGroupEntry(
+        group_id,
+        [{"egress_port": port, "instance": instance}
+         for port, instance in replicas],
+    )
+    switch.WritePREEntry(entry)
+
+
+def writePolymorphicScheduleRule(p4info_helper, switch, destination,
+                                  packet_direction):
+    """Schedule only host-port input; the P4 ingress checks the full format."""
+    if packet_direction not in (0, 1):
+        raise ValueError("packet_direction must be 0 or 1")
+    entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.polymorphic_schedule",
+        match_fields={
+            "standard_metadata.ingress_port": 1,
+            "hdr.ipv4.dstAddr": destination,
+            "hdr.udp.dstPort": 5000,
+        },
+        action_name="MyIngress.start_polymorphic",
+        action_params={"packet_direction": packet_direction},
+    )
+    switch.WriteTableEntry(entry)
 
 def writeArp_matchRules(p4info_helper, sw, match_fields_1, match_fields_2, action_params):
 
@@ -175,17 +205,15 @@ def main(p4info_file_path, bmv2_file_path):
         writeIpv6_lpmRules(p4info_helper, s21, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:00", "port": 1})
         writeIpv6_lpmRules(p4info_helper, s1, ["fe80::1234", 128], {"dstAddr": "08:00:00:00:01:01", "port": 1})
 
-        # STUDENT TODO M3-M5
-        # 1. Add one helper that writes MyIngress.polymorphic_schedule.
-        # 2. Add one helper that creates multicast group 10 with ports 2/3/4.
-        # 3. Install symmetric source/destination gateway roles on s1 and s2.
-        # 4. Add fault-table entries only after the no-fault path is correct.
-        #
-        # Suggested call shape (names are a contract, implementation is yours):
-        # writeMulticastGroup(p4info_helper, s1, group_id=10,
-        #                     replicas=[(2, 1), (3, 2), (4, 3)])
-        # writeMulticastGroup(p4info_helper, s2, group_id=10,
-        #                     replicas=[(2, 1), (3, 2), (4, 3)])
+        # Install PRE before enabling either source schedule. Intermediate
+        # switches retain only their original ordinary forwarding entries.
+        writeMulticastGroup(p4info_helper, s1)
+        writeMulticastGroup(p4info_helper, s2)
+        writePolymorphicScheduleRule(p4info_helper, s1, "10.0.2.2", 0)
+        writePolymorphicScheduleRule(p4info_helper, s2, "10.0.1.1", 1)
+
+        # TODO M5-M6: destination roles, adjudication and restoration.
+        # Fault injection is deliberately left to a later stage.
         
 
     except KeyboardInterrupt:

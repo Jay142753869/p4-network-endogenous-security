@@ -1,0 +1,24 @@
+OFFLINE ONLY: JSON interpretation, Python CRC/PRE models, protobuf construction.
+test_crc_order_and_stable_fields (__main__.M3Checks.test_crc_order_and_stable_fields) ... ok
+test_eligibility_mutations (__main__.M3Checks.test_eligibility_mutations) ... ok
+test_encapsulated_packets_never_reschedule (__main__.M3Checks.test_encapsulated_packets_never_reschedule) ... FAIL
+test_ordinary_wire_packets_and_table_miss (__main__.M3Checks.test_ordinary_wire_packets_and_table_miss) ... ok
+test_p4info_and_real_p4runtime_requests (__main__.M3Checks.test_p4info_and_real_p4runtime_requests) ... ok
+test_parser_errors_drop_before_tables (__main__.M3Checks.test_parser_errors_drop_before_tables) ... ok
+test_pre_replica_snapshot_model (__main__.M3Checks.test_pre_replica_snapshot_model) ... ok
+test_sequence_headers_direction_and_wrap (__main__.M3Checks.test_sequence_headers_direction_and_wrap) ... ok
+
+======================================================================
+FAIL: test_encapsulated_packets_never_reschedule (__main__.M3Checks.test_encapsulated_packets_never_reschedule)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m3.py", line 249, in test_encapsulated_packets_never_reschedule
+    self.assert_not_scheduled(p)
+  File "/home/p4/p4-poly-work/p4-poly-lab/tests/check_m3.py", line 197, in assert_not_scheduled
+    self.assertEqual(packet.dropped, dropped)
+AssertionError: True != False
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.019s
+
+FAILED (failures=1)
