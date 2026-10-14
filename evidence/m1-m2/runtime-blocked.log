@@ -1,0 +1,28 @@
+Runtime validation was attempted but could not start under this environment.
+Scapy import scapy.all failed before sending any packet:
+  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  PermissionError: [Errno 1] Operation not permitted
+
+BMv2 command attempted (file inputs were not created because Scapy import failed):
+simple_switch --use-files 3 -i 1@build/m2-smoke/p1 -i 2@build/m2-smoke/p2 --thrift-port 19091 --device-id 91 --notifications-addr ipc:///tmp/poly-m2-smoke-notifications.ipc --log-console build/polymorphic.json
+The process aborted during nanomsg socket binding, before packet parsing.
+No BMv2 packet processing or Mininet connectivity result was obtained.
+
+Raw BMv2 startup output follows:
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(nn_usock_bind+0xd5)[0x7e92dafb6fa3]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(+0x34d1f)[0x7e92dafd0d1f]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(nn_bipc_create+0x129)[0x7e92dafd005b]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(+0x3603b)[0x7e92dafd203b]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(nn_ep_init+0x167)[0x7e92dafae200]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(nn_sock_add_ep+0x6c)[0x7e92dafb303e]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(+0x14de3)[0x7e92dafb0de3]
+/lib/x86_64-linux-gnu/libnanomsg.so.5.0.0(nn_bind+0x67)[0x7e92dafafa2b]
+simple_switch(_ZN2nn6socket4bindEPKc+0x2b)[0x63e5d573f6f7]
+simple_switch(_ZN2bm16TransportNanomsg5open_Ev+0x43)[0x63e5d573fa11]
+simple_switch(_ZN2bm14TransportIface4openEv+0x42)[0x63e5d56b44c0]
+simple_switch(_ZN2bm15SwitchWContexts24init_from_options_parserERKNS_13OptionsParserESt10shared_ptrINS_14TransportIfaceEESt10unique_ptrINS_11DevMgrIfaceESt14default_deleteIS8_EE+0x129)[0x63e5d5732ec9]
+simple_switch(main+0xaff)[0x63e5d54bbb51]
+/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca)[0x7e92da82a1ca]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b)[0x7e92da82a28b]
+simple_switch(_start+0x25)[0x63e5d54ba7b5]
+Operation not permitted [1] (/home/p4/src/behavioral-model/tmp.DiI2DlWK6K/nanomsg-1.0.0/src/aio/usock_posix.inc:291)

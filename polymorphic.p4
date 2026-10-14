@@ -22,6 +22,11 @@ const bit<16> ARP_OPER_REPLY     = 2;
 
 #define MAX_HOPS 9
 
+error {
+    InvalidPolyShim,
+    UnsupportedInnerIPv4
+}
+
 /*
  * STUDENT TODO ROADMAP
  *
@@ -179,8 +184,17 @@ parser MyParser(packet_in packet,
     state parse_srcRouting {
         packet.extract(hdr.srcRoutes.next);
         transition select(hdr.srcRoutes.last.bos) {
-            1: parse_ipv4;
+            1: parse_sr_payload;
             default: parse_srcRouting;
+        }
+    }
+
+    state parse_sr_payload {
+        // Original SR carries IPv4 (first nibble 4); the new SR modality
+        // carries PolyShim directly. Lookahead does not consume either one.
+        transition select(packet.lookahead<bit<16>>()) {
+            POLY_MAGIC: parse_poly;
+            default: parse_ipv4;
         }
     }
     
@@ -192,16 +206,49 @@ parser MyParser(packet_in packet,
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
+        // The experiment uses a fixed 20-byte IPv4 header, without fragments.
+        // Keep options/fragments opaque for ordinary IPv4 forwarding.
+        transition select(hdr.ipv4.version, hdr.ipv4.ihl,
+                          hdr.ipv4.flags & 3w1, hdr.ipv4.fragOffset) {
+            (4, 5, 0, 0): parse_ipv4_payload;
+            default: accept;
+        }
+    }
+
+    state parse_ipv4_payload {
         transition select(hdr.ipv4.protocol) {
             6: parse_tcp;
             17: parse_udp;
+            POLY_IP_PROTOCOL: parse_poly;
             default: accept;
         }
     }
     
     state parse_ipv6{
 	packet.extract(hdr.ipv6);
-	transition accept;
+	transition select(hdr.ipv6.nextHdr) {
+            POLY_IP_PROTOCOL: parse_poly;
+            default: accept;
+        }
+    }
+
+    state parse_poly {
+        packet.extract(hdr.poly);
+        verify(hdr.poly.magic == POLY_MAGIC &&
+               hdr.poly.inner_ether_type == TYPE_IPV4,
+               error.InvalidPolyShim);
+        transition parse_inner_ipv4;
+    }
+
+    state parse_inner_ipv4 {
+        packet.extract(hdr.inner_ipv4);
+        // Never overwrite hdr.ipv4: intermediate IPv4 routing and TTL updates
+        // must operate on the outer header, leaving the inner packet intact.
+        verify(hdr.inner_ipv4.version == 4 && hdr.inner_ipv4.ihl == 5 &&
+               (hdr.inner_ipv4.flags & 3w1) == 0 &&
+               hdr.inner_ipv4.fragOffset == 0 && hdr.inner_ipv4.protocol == 17,
+               error.UnsupportedInnerIPv4);
+        transition parse_udp;
     }
 
     state parse_tcp {
@@ -212,8 +259,16 @@ parser MyParser(packet_in packet,
     state parse_udp {
         packet.extract(hdr.udp);
 
-        // TODO M2: only the fixed UDP/5000 experiment format continues to
-        // PolyShim/protected-data parsing. Ordinary UDP must remain accepted.
+        // M2: UDP length includes its 8-byte header and 16 protected bytes.
+        // All other UDP payloads remain untouched, including ordinary SR UDP.
+        transition select(hdr.udp.dstPort, hdr.udp.pkt_length) {
+            (POLY_UDP_PORT, 24): parse_protected_data;
+            default: accept;
+        }
+    }
+
+    state parse_protected_data {
+        packet.extract(hdr.protected_data);
         transition accept;
     }
 

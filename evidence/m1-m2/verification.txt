@@ -1,0 +1,23 @@
+$ p4c-bm2-ss --version
+p4c-bm2-ss
+Version 1.2.5.15 (SHA: cdd7205767 BUILD: Release)
+exit_code=0
+$ simple_switch --version
+1.15.4-883d4eae
+exit_code=0
+$ mn --version
+2.3.1b4
+exit_code=0
+$ python3 -m py_compile mycontroller.py send-poly.py receive-poly.py run-poly-tests.py read-counters.py evaluate-counters.py tests/check_m2_parser.py
+
+exit_code=0
+$ git --git-dir=.course-git --work-tree=. diff --check
+
+exit_code=0
+$ git --git-dir=.course-git --work-tree=. diff --exit-code 1e739c0 -- mycontroller.py utils topo reference materials run-poly-tests.py read-counters.py evaluate-counters.py send-poly.py receive-poly.py STUDENT_TODO.md
+
+exit_code=0
+sha256 polymorphic.p4 842012445d25dbdb62268437ba14be1a7db517c186aa6c4f734295fc0e620f70
+sha256 build/polymorphic.json 344ab5d84be43d72a0fbbc3855dd9b16bdaf3dbf20d480793118df46cdda0a7a
+sha256 build/polymorphic.p4.p4info.txtpb 818492894595e46030a6d1e5277137a3706f70b6baec89542ccda259c4c3d15b
+Git metadata: .course-git (the environment-provided .git directory is read-only)
